@@ -32,6 +32,7 @@ import (
 	"github.com/lightningnetwork/lnd/netann"
 	"github.com/lightningnetwork/lnd/peer"
 	"github.com/lightningnetwork/lnd/peernotifier"
+	"github.com/lightningnetwork/lnd/remotesigner"
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/routing/localchans"
 	"github.com/lightningnetwork/lnd/signal"
@@ -124,6 +125,7 @@ func SetupLoggers(root *build.RotatingLogWriter) {
 	AddSubLogger(root, "CHFD", chanfunding.UseLogger)
 	AddSubLogger(root, "PEER", peer.UseLogger)
 	AddSubLogger(root, "CHCL", chancloser.UseLogger)
+	AddSubLogger(root, "RSGN", remotesigner.UseLogger)
 
 	AddSubLogger(root, routing.Subsystem, routing.UseLogger, localchans.UseLogger)
 	AddSubLogger(root, routerrpc.Subsystem, routerrpc.UseLogger)
