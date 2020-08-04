@@ -43,6 +43,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
 	"github.com/lightningnetwork/lnd/macaroons"
+	"github.com/lightningnetwork/lnd/remotesigner"
 	"github.com/lightningnetwork/lnd/signal"
 	"github.com/lightningnetwork/lnd/tor"
 	"github.com/lightningnetwork/lnd/walletunlocker"
@@ -386,6 +387,13 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 
 		// Otherwise we'll return the regular listeners.
 		return getListeners()
+	}
+
+	err = remotesigner.Initialize()
+	if err != nil {
+		err := fmt.Errorf("unable to initialize remotesigner: %v", err)
+		ltndLog.Error(err)
+		return err
 	}
 
 	// We wait until the user provides a password over RPC. In case lnd is
@@ -1097,11 +1105,20 @@ func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 			recoveryWindow,
 		)
 
+		// Let the remotesigner use the same seed so it can shadow
+		// internal signature generation.  If seed is empty one
+		// will be randomly generated and returned.
+		nonNilSeed, err := remotesigner.InitNode(
+			cfg.networkName(), cipherSeed.Entropy[:])
+		if err != nil {
+			return nil, fmt.Errorf("remotesigner.InitNode failed: %v", err)
+		}
+
 		// With the seed, we can now use the wallet loader to create
 		// the wallet, then pass it back to avoid unlocking it again.
 		birthday := cipherSeed.BirthdayTime()
 		newWallet, err := loader.CreateNewWallet(
-			password, password, cipherSeed.Entropy[:], birthday,
+			password, password, nonNilSeed, birthday,
 		)
 		if err != nil {
 			// Don't leave the file open in case the new wallet

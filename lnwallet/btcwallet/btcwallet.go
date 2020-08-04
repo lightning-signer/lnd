@@ -23,6 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
+	"github.com/lightningnetwork/lnd/remotesigner"
 )
 
 const (
@@ -105,10 +106,25 @@ func New(cfg Config) (*BtcWallet, error) {
 		}
 
 		if !walletExists {
+			var networkName string
+			switch cfg.CoinType {
+			case 0:
+				networkName = "bitcoin"
+			case 1:
+				networkName = "testnet"
+			default:
+				return nil, fmt.Errorf("unexpected cointype: %v", cfg.CoinType)
+			}
+			// Let the remotesigner use the same seed so it can shadow
+			// internal signature generation.  If seed is empty one
+			// will be created from entropy and returned.
+			nonNilSeed, err := remotesigner.InitNode(
+				networkName, cfg.HdSeed)
+
 			// Wallet has never been created, perform initial
 			// set up.
 			wallet, err = loader.CreateNewWallet(
-				pubPass, cfg.PrivatePass, cfg.HdSeed,
+				pubPass, cfg.PrivatePass, nonNilSeed,
 				cfg.Birthday,
 			)
 			if err != nil {
