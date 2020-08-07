@@ -1088,7 +1088,7 @@ func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 		// internal signature generation.  If seed is empty one
 		// will be randomly generated and returned.
 		nonNilSeed, err := remotesigner.InitNode(
-			cfg.networkName(), cipherSeed.Entropy[:])
+			cfg.networkName(), cipherSeed.Entropy[:], "WalletUnlockParams")
 		if err != nil {
 			return nil, fmt.Errorf("remotesigner.InitNode failed: %v", err)
 		}
