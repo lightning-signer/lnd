@@ -6,32 +6,41 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/go-errors/errors"
 	"google.golang.org/grpc"
 )
 
-var (
-	serverAddr = "localhost:50051"
-
-	conn *grpc.ClientConn
-
-	client SignerClient
-
-	nodeIDValid bool = false
+type remoteSignerState struct {
+	serverAddr  string
+	conn        *grpc.ClientConn
+	client      SignerClient
+	nodeIDValid bool
 	nodeID      [33]byte
+}
+
+var (
+	state remoteSignerState = remoteSignerState{
+		serverAddr:  "localhost:50051",
+		nodeIDValid: false,
+	}
+
+	ErrRemoteSignerNodeIDNotSet = errors.New("remotesigner nodeid not set")
 )
 
 func Initialize() error {
 	var err error
 
-	log.Infof("Initialize: %s", serverAddr)
+	log.Infof("Initialize: %s", state.serverAddr)
 
-	conn, err = grpc.Dial(serverAddr, grpc.WithInsecure(), grpc.WithBlock())
+	state.conn, err = grpc.Dial(
+		state.serverAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return err
 	}
 
-	client = NewSignerClient(conn)
+	state.client = NewSignerClient(state.conn)
 
 	return nil
 }
@@ -39,9 +48,9 @@ func Initialize() error {
 func InitNode(networkName string, seed0 []byte, debugCaller string) ([]byte, error) {
 	var useSeed []byte
 
-	if nodeIDValid {
+	if state.nodeIDValid {
 		return nil, fmt.Errorf("InitNode called w/ nodeID already set: %v",
-			hex.EncodeToString(nodeID[:]))
+			hex.EncodeToString(state.nodeID[:]))
 	}
 
 	// If no entropy was supplied make some up.
@@ -63,7 +72,7 @@ func InitNode(networkName string, seed0 []byte, debugCaller string) ([]byte, err
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rsp, err := client.Init(ctx, &InitRequest{
+	rsp, err := state.client.Init(ctx, &InitRequest{
 		NodeConfig: &NodeConfig{
 			KeyDerivationStyle: NodeConfig_LND,
 		},
@@ -79,10 +88,11 @@ func InitNode(networkName string, seed0 []byte, debugCaller string) ([]byte, err
 		return nil, fmt.Errorf("nodeid from remotesigner wrong size: %v",
 			len(rsp.NodeId.Data))
 	}
-	copy(nodeID[:], rsp.NodeId.Data)
-	nodeIDValid = true
+	copy(state.nodeID[:], rsp.NodeId.Data)
+	state.nodeIDValid = true
 
-	log.Infof("InitNode: returned nodeID: %s", hex.EncodeToString(nodeID[:]))
+	log.Infof("InitNode: returned nodeID: %s",
+		hex.EncodeToString(state.nodeID[:]))
 
 	// Return the seed we used.
 	return useSeed, nil
@@ -97,19 +107,42 @@ func SetNodeID(serializedPubKey [33]byte) error {
 	// If the remotesigner's nodeid is set compare it to the server's
 	// nodeid.  Otherwise set the remotesigner's nodeid for future
 	// interface calls.
-	if !nodeIDValid {
+	if !state.nodeIDValid {
 		log.Debugf("SetNodeID: setting nodeID: %s",
-			hex.EncodeToString(nodeID[:]))
-		nodeID = serializedPubKey
-		nodeIDValid = true
+			hex.EncodeToString(state.nodeID[:]))
+		state.nodeID = serializedPubKey
+		state.nodeIDValid = true
 	} else {
 		log.Debugf("SetNodeID: comparing nodeID")
-		if serializedPubKey != nodeID {
+		if serializedPubKey != state.nodeID {
 			log.Errorf("serializedPubKey %s != nodeID %s",
 				hex.EncodeToString(serializedPubKey[:]),
-				hex.EncodeToString(nodeID[:]))
+				hex.EncodeToString(state.nodeID[:]))
 			return fmt.Errorf("remotesigner nodeID mismatch")
 		}
 	}
 	return nil
+}
+
+func ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	if !state.nodeIDValid {
+		return [32]byte{}, ErrRemoteSignerNodeIDNotSet
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := state.client.ECDH(ctx, &ECDHRequest{
+		NodeId: &NodeId{Data: state.nodeID[:]},
+		Point:  &PubKey{Data: pubKey.SerializeCompressed()},
+	})
+	if err != nil {
+		// We need to log the error here because it seems callers don't
+		// get this error into the log.
+		log.Errorf("state.client.ECDH failed: %v", err)
+		return [32]byte{}, err
+	}
+	var secret [32]byte
+	copy(secret[:], rsp.SharedSecret.Data)
+	return secret, nil
 }

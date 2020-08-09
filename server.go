@@ -337,8 +337,12 @@ func newServer(cfg *Config, listenAddrs []net.Addr, chanDB *channeldb.DB,
 	torController *tor.Controller) (*server, error) {
 
 	var (
-		err           error
-		nodeKeyECDH   = keychain.NewPubKeyECDH(*nodeKeyDesc, cc.keyRing)
+		err error
+		// Use the remotesigner ECDH, which shadows an embedded
+		// PubKeyECDH and validates the remotesigner's signatures.
+		nodeKeyECDH = remotesigner.NewRemoteSignerECDH(
+			*nodeKeyDesc, cc.keyRing,
+		)
 		nodeKeySigner = keychain.NewPubKeyDigestSigner(
 			*nodeKeyDesc, cc.keyRing,
 		)
