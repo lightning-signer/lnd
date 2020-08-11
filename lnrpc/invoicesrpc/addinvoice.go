@@ -36,7 +36,7 @@ type AddInvoiceConfig struct {
 
 	// NodeSigner is an implementation of the MessageSigner implementation
 	// that's backed by the identity private key of the running lnd node.
-	NodeSigner *netann.NodeSigner
+	NodeSigner netann.NodeSigner
 
 	// DefaultCLTVExpiry is the default invoice expiry if no values is
 	// specified.

@@ -579,7 +579,7 @@ func newRPCServer(cfg *Config, s *server, macService *macaroons.Service,
 	err = subServerCgs.PopulateDependencies(
 		cfg, s.cc, cfg.networkDir, macService, atpl, invoiceRegistry,
 		s.htlcSwitch, activeNetParams.Params, s.chanRouter,
-		routerBackend, s.nodeSigner, s.chanDB, s.sweeper, tower,
+		routerBackend, &s.nodeSigner, s.chanDB, s.sweeper, tower,
 		s.towerClient, cfg.net.ResolveTCPAddr, genInvoiceFeatures,
 		rpcsLog,
 	)

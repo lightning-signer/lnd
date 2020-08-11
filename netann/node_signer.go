@@ -10,16 +10,22 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet"
 )
 
-// NodeSigner is an implementation of the MessageSigner interface backed by the
-// identity private key of running lnd node.
-type NodeSigner struct {
+type NodeSigner interface {
+	lnwallet.MessageSigner
+	SignDigestCompact(digest []byte) ([]byte, error)
+	SignCompact(msg []byte) ([]byte, error)
+}
+
+// NodeSignerImpl is an implementation of the MessageSigner interface
+// backed by the identity private key of running lnd node.
+type NodeSignerImpl struct {
 	keySigner keychain.SingleKeyDigestSigner
 }
 
-// NewNodeSigner creates a new instance of the NodeSigner backed by the target
-// private key.
-func NewNodeSigner(keySigner keychain.SingleKeyDigestSigner) *NodeSigner {
-	return &NodeSigner{
+// NewNodeSignerImpl creates a new instance of the NodeSignerImpl
+// backed by the target private key.
+func NewNodeSignerImpl(keySigner keychain.SingleKeyDigestSigner) *NodeSignerImpl {
+	return &NodeSignerImpl{
 		keySigner: keySigner,
 	}
 }
@@ -27,7 +33,7 @@ func NewNodeSigner(keySigner keychain.SingleKeyDigestSigner) *NodeSigner {
 // SignMessage signs a double-sha256 digest of the passed msg under the
 // resident node's private key. If the target public key is _not_ the node's
 // private key, then an error will be returned.
-func (n *NodeSigner) SignMessage(pubKey *btcec.PublicKey,
+func (n *NodeSignerImpl) SignMessage(pubKey *btcec.PublicKey,
 	msg []byte) (input.Signature, error) {
 
 	// If this isn't our identity public key, then we'll exit early with an
@@ -50,7 +56,7 @@ func (n *NodeSigner) SignMessage(pubKey *btcec.PublicKey,
 // SignCompact signs a double-sha256 digest of the msg parameter under the
 // resident node's private key. The returned signature is a pubkey-recoverable
 // signature.
-func (n *NodeSigner) SignCompact(msg []byte) ([]byte, error) {
+func (n *NodeSignerImpl) SignCompact(msg []byte) ([]byte, error) {
 	// We'll sign the dsha256 of the target message.
 	digest := chainhash.DoubleHashB(msg)
 
@@ -59,7 +65,7 @@ func (n *NodeSigner) SignCompact(msg []byte) ([]byte, error) {
 
 // SignDigestCompact signs the provided message digest under the resident
 // node's private key. The returned signature is a pubkey-recoverable signature.
-func (n *NodeSigner) SignDigestCompact(hash []byte) ([]byte, error) {
+func (n *NodeSignerImpl) SignDigestCompact(hash []byte) ([]byte, error) {
 	var digest [32]byte
 	copy(digest[:], hash)
 
@@ -72,6 +78,6 @@ func (n *NodeSigner) SignDigestCompact(hash []byte) ([]byte, error) {
 	return sig, nil
 }
 
-// A compile time check to ensure that NodeSigner implements the MessageSigner
-// interface.
-var _ lnwallet.MessageSigner = (*NodeSigner)(nil)
+// A compile time check to ensure that NodeSignerImpl implements the
+// MessageSigner interface.
+var _ lnwallet.MessageSigner = (*NodeSignerImpl)(nil)

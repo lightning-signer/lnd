@@ -629,7 +629,7 @@ func createTestPeer(notifier chainntnfs.ChainNotifier,
 		return nil, nil, nil, err
 	}
 
-	nodeSignerAlice := netann.NewNodeSigner(aliceKeySigner)
+	nodeSignerAlice := netann.NewNodeSignerImpl(aliceKeySigner)
 
 	const chanActiveTimeout = time.Minute
 

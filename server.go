@@ -144,7 +144,7 @@ type server struct {
 
 	// nodeSigner is an implementation of the MessageSigner implementation
 	// that's backed by the identity private key of the running lnd node.
-	nodeSigner *netann.NodeSigner
+	nodeSigner netann.NodeSigner
 
 	chanStatusMgr *netann.ChanStatusManager
 
@@ -431,7 +431,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr, chanDB *channeldb.DB,
 		channelNotifier: channelnotifier.New(chanDB),
 
 		identityECDH: nodeKeyECDH,
-		nodeSigner:   netann.NewNodeSigner(nodeKeySigner),
+		nodeSigner:   netann.NewNodeSignerImpl(nodeKeySigner),
 
 		listenAddrs: listenAddrs,
 
