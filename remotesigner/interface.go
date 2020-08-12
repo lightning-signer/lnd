@@ -1,6 +1,7 @@
 package remotesigner
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/go-errors/errors"
+	"github.com/lightningnetwork/lnd/input"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"google.golang.org/grpc"
 )
 
@@ -109,7 +112,7 @@ func SetNodeID(serializedPubKey [33]byte) error {
 	// interface calls.
 	if !state.nodeIDValid {
 		log.Debugf("SetNodeID: setting nodeID: %s",
-			hex.EncodeToString(state.nodeID[:]))
+			hex.EncodeToString(serializedPubKey[:]))
 		state.nodeID = serializedPubKey
 		state.nodeIDValid = true
 	} else {
@@ -145,4 +148,107 @@ func ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 	var secret [32]byte
 	copy(secret[:], rsp.SharedSecret.Data)
 	return secret, nil
+}
+
+func SignAnnouncement(pubKey *btcec.PublicKey,
+	msg lnwire.Message) (input.Signature, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+
+	err := validateLocalNodePublicKey(pubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	switch m := msg.(type) {
+	case *lnwire.ChannelAnnouncement:
+		return signChannelAnnouncement(pubKey, m)
+	case *lnwire.ChannelUpdate:
+		return signChannelUpdate(pubKey, m)
+	case *lnwire.NodeAnnouncement:
+		return signNodeAnnouncement(pubKey, m)
+	default:
+		return nil, fmt.Errorf("can't remotesign %T message", m)
+	}
+}
+
+func signChannelAnnouncement(pubKey *btcec.PublicKey,
+	msg *lnwire.ChannelAnnouncement) (input.Signature, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("SignChannelAnnouncement: pubKey %s, msg %v",
+		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
+
+	return nil, fmt.Errorf("SignChannelAnnouncement UNIMPLEMENTED")
+}
+
+func signChannelUpdate(pubKey *btcec.PublicKey,
+	msg *lnwire.ChannelUpdate) (input.Signature, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("SignChannelUpdate: pubKey %s, msg %v",
+		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	data, err := msg.DataToSign()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("SignChannelUpdate: DataToSign %s", hex.EncodeToString(data))
+
+	rsp, err := state.client.SignChannelUpdate(ctx,
+		&SignChannelUpdateRequest{
+			NodeId:        &NodeId{Data: state.nodeID[:]},
+			ChannelUpdate: data[:],
+		})
+	if err != nil {
+		return nil, err
+	}
+	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
+}
+
+func signNodeAnnouncement(pubKey *btcec.PublicKey,
+	msg *lnwire.NodeAnnouncement) (input.Signature, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("SignNodeAnnouncement: pubKey %s, msg %v",
+		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	data, err := msg.DataToSign()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("SignNodeAnnouncement: DataToSign %s", hex.EncodeToString(data))
+
+	rsp, err := state.client.SignNodeAnnouncement(ctx,
+		&SignNodeAnnouncementRequest{
+			NodeId:           &NodeId{Data: state.nodeID[:]},
+			NodeAnnouncement: data[:],
+		})
+	if err != nil {
+		return nil, err
+	}
+	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
+}
+
+func validateLocalNodePublicKey(pubKey *btcec.PublicKey) error {
+	if !bytes.Equal(pubKey.SerializeCompressed(), state.nodeID[:]) {
+		log.Errorf("validateLocalNodePublicKey failed: "+
+			"pubKey %s != state.nodeID %s",
+			hex.EncodeToString(pubKey.SerializeCompressed()),
+			state.nodeID[:])
+		return fmt.Errorf("remotesigner nodeid pubkey mismatch")
+	}
+	return nil
 }

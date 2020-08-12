@@ -46,3 +46,7 @@ func (rs *RemoteSignerECDH) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 
 	return secretLocal, nil
 }
+
+// A compile time check to ensure that RemoteSignerECDH implements the
+// PubKeyECDH interface.
+var _ keychain.SingleKeyECDH = (*RemoteSignerECDH)(nil)

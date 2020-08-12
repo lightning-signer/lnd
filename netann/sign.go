@@ -1,12 +1,15 @@
 package netann
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
+	"github.com/lightningnetwork/lnd/remotesigner"
 )
 
 // SignAnnouncement signs any type of gossip message that is announced on the
@@ -33,5 +36,24 @@ func SignAnnouncement(signer lnwallet.MessageSigner, pubKey *btcec.PublicKey,
 		return nil, fmt.Errorf("unable to get data to sign: %v", err)
 	}
 
-	return signer.SignMessage(pubKey, data)
+	lclSignature, err := signer.SignMessage(pubKey, data)
+	if err != nil {
+		return nil, err
+	}
+
+	rmtSignature, err := remotesigner.SignAnnouncement(pubKey, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	if !bytes.Equal(lclSignature.Serialize(), rmtSignature.Serialize()) {
+		log.Errorf(
+			"SignAnnouncement: "+
+				"remotesigner signature mismatch lcl %s != rmt %s",
+			hex.EncodeToString(lclSignature.Serialize()),
+			hex.EncodeToString(rmtSignature.Serialize()))
+		return nil, fmt.Errorf("remote signature msimatch")
+	}
+
+	return lclSignature, nil
 }
