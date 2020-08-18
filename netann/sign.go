@@ -52,7 +52,7 @@ func SignAnnouncement(signer lnwallet.MessageSigner, pubKey *btcec.PublicKey,
 				"remotesigner signature mismatch lcl %s != rmt %s",
 			hex.EncodeToString(lclSignature.Serialize()),
 			hex.EncodeToString(rmtSignature.Serialize()))
-		return nil, fmt.Errorf("remote signature msimatch")
+		return nil, fmt.Errorf("remote signature mismatch")
 	}
 
 	return lclSignature, nil

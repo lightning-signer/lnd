@@ -25,6 +25,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwallet/chanvalidate"
 	"github.com/lightningnetwork/lnd/lnwire"
+	"github.com/lightningnetwork/lnd/remotesigner"
 	"github.com/lightningnetwork/lnd/shachain"
 )
 
@@ -776,6 +777,19 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.partialState.IdentityPub = nodeID
 
 	var err error
+
+	err = remotesigner.NewChannel(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
+	bps, err := remotesigner.GetChannelBasepoints(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
 	reservation.ourContribution.MultiSigKey, err = keyRing.DeriveNextKey(
 		keychain.KeyFamilyMultiSig,
 	)
@@ -805,6 +819,13 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	)
 	if err != nil {
 		return err
+	}
+
+	ourContrib := reservation.ourContribution
+	if !bytes.Equal(
+		ourContrib.RevocationBasePoint.PubKey.SerializeCompressed(),
+		bps.Revocation.SerializeCompressed()) {
+		return fmt.Errorf("remote RevocationBasePoint mismatch")
 	}
 
 	// With the above keys created, we'll also need to initialization our

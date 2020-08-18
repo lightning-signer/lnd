@@ -252,3 +252,81 @@ func validateLocalNodePublicKey(pubKey *btcec.PublicKey) error {
 	}
 	return nil
 }
+
+func channelNonce(peerNodeID *btcec.PublicKey, pendingChanID [32]byte) []byte {
+	retval := peerNodeID.SerializeCompressed()
+	retval = append(retval, pendingChanID[:]...)
+	log.Debugf("channelNonce: %s", hex.EncodeToString(retval))
+	return retval
+}
+
+func NewChannel(peerNodeID *btcec.PublicKey, pendingChanID [32]byte) error {
+	if !state.nodeIDValid {
+		return ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("NewChannel: peerNodeID=%s, pendingChanID=%s",
+		hex.EncodeToString(peerNodeID.SerializeCompressed()),
+		hex.EncodeToString(pendingChanID[:]))
+
+	channelNonce := channelNonce(peerNodeID, pendingChanID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := state.client.NewChannel(ctx,
+		&NewChannelRequest{
+			NodeId:       &NodeId{Data: state.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: channelNonce},
+		})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ChannelBasepoints struct {
+	Revocation     *btcec.PublicKey
+	Payment        *btcec.PublicKey
+	Htlc           *btcec.PublicKey
+	DelayedPayment *btcec.PublicKey
+	FundingPubkey  *btcec.PublicKey
+}
+
+func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
+	pendingChanID [32]byte) (*ChannelBasepoints, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("GetChannelBasepoints: peerNodeID=%s, pendingChanID=%s",
+		hex.EncodeToString(peerNodeID.SerializeCompressed()),
+		hex.EncodeToString(pendingChanID[:]))
+
+	channelNonce := channelNonce(peerNodeID, pendingChanID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := state.client.GetChannelBasepoints(ctx,
+		&GetChannelBasepointsRequest{
+			NodeId:       &NodeId{Data: state.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: channelNonce},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	revPoint, err :=
+		btcec.ParsePubKey(rsp.Basepoints.Revocation.Data, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChannelBasepoints{
+		Revocation: revPoint,
+		// Payment:
+		// Htlc:
+		// DelayedPayment:
+		// FundingPubkey:
+	}, nil
+}
