@@ -264,7 +264,7 @@ func NewChannel(peerNodeID *btcec.PublicKey, pendingChanID [32]byte) error {
 	if !state.nodeIDValid {
 		return ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("NewChannel: peerNodeID=%s, pendingChanID=%s",
+	log.Debugf("NewChannel request: peerNodeID=%s, pendingChanID=%s",
 		hex.EncodeToString(peerNodeID.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]))
 
@@ -298,7 +298,7 @@ func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
 	if !state.nodeIDValid {
 		return nil, ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("GetChannelBasepoints: peerNodeID=%s, pendingChanID=%s",
+	log.Debugf("GetChannelBasepoints request: peerNodeID=%s, pendingChanID=%s",
 		hex.EncodeToString(peerNodeID.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]))
 
@@ -322,11 +322,45 @@ func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
 		return nil, err
 	}
 
+	payPoint, err :=
+		btcec.ParsePubKey(rsp.Basepoints.Payment.Data, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	htlcPoint, err :=
+		btcec.ParsePubKey(rsp.Basepoints.Htlc.Data, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	delayPoint, err :=
+		btcec.ParsePubKey(rsp.Basepoints.DelayedPayment.Data, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	fundPoint, err :=
+		btcec.ParsePubKey(rsp.Basepoints.FundingPubkey.Data, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("GetChannelBasepoints response: "+
+		"Revocation=%s, Payment=%s, Htlc=%s, "+
+		"DelayedPayment=%s, FundingPubkey=%s ",
+		hex.EncodeToString(revPoint.SerializeCompressed()),
+		hex.EncodeToString(payPoint.SerializeCompressed()),
+		hex.EncodeToString(htlcPoint.SerializeCompressed()),
+		hex.EncodeToString(delayPoint.SerializeCompressed()),
+		hex.EncodeToString(fundPoint.SerializeCompressed()),
+	)
+
 	return &ChannelBasepoints{
-		Revocation: revPoint,
-		// Payment:
-		// Htlc:
-		// DelayedPayment:
-		// FundingPubkey:
+		Revocation:     revPoint,
+		Payment:        payPoint,
+		Htlc:           htlcPoint,
+		DelayedPayment: delayPoint,
+		FundingPubkey:  fundPoint,
 	}, nil
 }

@@ -777,19 +777,6 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.partialState.IdentityPub = nodeID
 
 	var err error
-
-	err = remotesigner.NewChannel(
-		reservation.partialState.IdentityPub, reservation.pendingChanID)
-	if err != nil {
-		return err
-	}
-
-	bps, err := remotesigner.GetChannelBasepoints(
-		reservation.partialState.IdentityPub, reservation.pendingChanID)
-	if err != nil {
-		return err
-	}
-
 	reservation.ourContribution.MultiSigKey, err = keyRing.DeriveNextKey(
 		keychain.KeyFamilyMultiSig,
 	)
@@ -821,11 +808,45 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 		return err
 	}
 
-	ourContrib := reservation.ourContribution
+	// Fetch the basepoints from the remotesigner.
+	err = remotesigner.NewChannel(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
+	bps, err := remotesigner.GetChannelBasepoints(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
+	// Compare the remotesigner's returned basepoints to the ones derived here.
+	oc := reservation.ourContribution
 	if !bytes.Equal(
-		ourContrib.RevocationBasePoint.PubKey.SerializeCompressed(),
+		oc.MultiSigKey.PubKey.SerializeCompressed(),
+		bps.FundingPubkey.SerializeCompressed()) {
+		return fmt.Errorf("remote MultiSigKey mismatch")
+	}
+	if !bytes.Equal(
+		oc.RevocationBasePoint.PubKey.SerializeCompressed(),
 		bps.Revocation.SerializeCompressed()) {
 		return fmt.Errorf("remote RevocationBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.HtlcBasePoint.PubKey.SerializeCompressed(),
+		bps.Htlc.SerializeCompressed()) {
+		return fmt.Errorf("remote HtlcBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.PaymentBasePoint.PubKey.SerializeCompressed(),
+		bps.Payment.SerializeCompressed()) {
+		return fmt.Errorf("remote PaymentBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.DelayBasePoint.PubKey.SerializeCompressed(),
+		bps.DelayedPayment.SerializeCompressed()) {
+		return fmt.Errorf("remote DelayBasePoint mismatch")
 	}
 
 	// With the above keys created, we'll also need to initialization our
