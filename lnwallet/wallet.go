@@ -823,6 +823,9 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 
 	// Compare the remotesigner's returned basepoints to the ones derived here.
 	oc := reservation.ourContribution
+	walletLog.Debugf("KeyDescriptors = [%v, %v, %v, %v, %v]",
+		oc.MultiSigKey, oc.RevocationBasePoint, oc.HtlcBasePoint,
+		oc.PaymentBasePoint, oc.DelayBasePoint)
 	if !bytes.Equal(
 		oc.MultiSigKey.PubKey.SerializeCompressed(),
 		bps.FundingPubkey.SerializeCompressed()) {

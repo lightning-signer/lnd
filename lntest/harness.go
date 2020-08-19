@@ -47,6 +47,9 @@ type NetworkHarness struct {
 	// chain backend, such as rpc configuration, P2P information etc.
 	BackendCfg BackendConfig
 
+	// UsingRemoteSigner is true if we are using the remotesigner.
+	UsingRemoteSigner bool
+
 	activeNodes map[int]*HarnessNode
 
 	nodesByPub map[string]*HarnessNode
@@ -84,6 +87,7 @@ func NewNetworkHarness(r *rpctest.Harness, b BackendConfig, lndBinary string) (
 		netParams:            r.ActiveNet,
 		Miner:                r,
 		BackendCfg:           b,
+		UsingRemoteSigner:    true,
 		quit:                 make(chan struct{}),
 		lndBinary:            lndBinary,
 	}
