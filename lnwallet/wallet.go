@@ -25,6 +25,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwallet/chanvalidate"
 	"github.com/lightningnetwork/lnd/lnwire"
+	"github.com/lightningnetwork/lnd/remotesigner"
 	"github.com/lightningnetwork/lnd/shachain"
 )
 
@@ -805,6 +806,50 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	)
 	if err != nil {
 		return err
+	}
+
+	// Fetch the basepoints from the remotesigner.
+	err = remotesigner.NewChannel(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
+	bps, err := remotesigner.GetChannelBasepoints(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
+	if err != nil {
+		return err
+	}
+
+	// Compare the remotesigner's returned basepoints to the ones derived here.
+	oc := reservation.ourContribution
+	walletLog.Debugf("KeyDescriptors = [%v, %v, %v, %v, %v]",
+		oc.MultiSigKey, oc.RevocationBasePoint, oc.HtlcBasePoint,
+		oc.PaymentBasePoint, oc.DelayBasePoint)
+	if !bytes.Equal(
+		oc.MultiSigKey.PubKey.SerializeCompressed(),
+		bps.FundingPubkey.SerializeCompressed()) {
+		return fmt.Errorf("remote MultiSigKey mismatch")
+	}
+	if !bytes.Equal(
+		oc.RevocationBasePoint.PubKey.SerializeCompressed(),
+		bps.Revocation.SerializeCompressed()) {
+		return fmt.Errorf("remote RevocationBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.HtlcBasePoint.PubKey.SerializeCompressed(),
+		bps.Htlc.SerializeCompressed()) {
+		return fmt.Errorf("remote HtlcBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.PaymentBasePoint.PubKey.SerializeCompressed(),
+		bps.Payment.SerializeCompressed()) {
+		return fmt.Errorf("remote PaymentBasePoint mismatch")
+	}
+	if !bytes.Equal(
+		oc.DelayBasePoint.PubKey.SerializeCompressed(),
+		bps.DelayedPayment.SerializeCompressed()) {
+		return fmt.Errorf("remote DelayBasePoint mismatch")
 	}
 
 	// With the above keys created, we'll also need to initialization our

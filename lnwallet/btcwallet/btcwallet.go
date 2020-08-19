@@ -120,6 +120,9 @@ func New(cfg Config) (*BtcWallet, error) {
 			// will be created from entropy and returned.
 			nonNilSeed, err := remotesigner.InitNode(
 				networkName, cfg.HdSeed, "btcwallet.New")
+			if err != nil {
+				return nil, err
+			}
 
 			// Wallet has never been created, perform initial
 			// set up.
