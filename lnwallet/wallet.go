@@ -3,6 +3,7 @@ package lnwallet
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -823,9 +824,16 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 
 	// Compare the remotesigner's returned basepoints to the ones derived here.
 	oc := reservation.ourContribution
-	walletLog.Debugf("KeyDescriptors = [%v, %v, %v, %v, %v]",
-		oc.MultiSigKey, oc.RevocationBasePoint, oc.HtlcBasePoint,
-		oc.PaymentBasePoint, oc.DelayBasePoint)
+	walletLog.Debugf("        MultiSigKey=%v %s", oc.MultiSigKey,
+		hex.EncodeToString(oc.MultiSigKey.PubKey.SerializeCompressed()))
+	walletLog.Debugf("RevocationBasePoint=%v %s", oc.RevocationBasePoint,
+		hex.EncodeToString(oc.RevocationBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("      HtlcBasePoint=%v %s", oc.HtlcBasePoint,
+		hex.EncodeToString(oc.HtlcBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("   PaymentBasePoint=%v %s", oc.PaymentBasePoint,
+		hex.EncodeToString(oc.PaymentBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("     DelayBasePoint=%v %s", oc.DelayBasePoint,
+		hex.EncodeToString(oc.DelayBasePoint.PubKey.SerializeCompressed()))
 	if !bytes.Equal(
 		oc.MultiSigKey.PubKey.SerializeCompressed(),
 		bps.FundingPubkey.SerializeCompressed()) {
