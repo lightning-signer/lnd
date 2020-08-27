@@ -1182,6 +1182,33 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		}
 	}
 
+	// We received accept_channel, update the remotesigner.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := remotesigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType.IsTweakless(),
+	)
+	if err != nil {
+		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
+		return
+	}
+
 	// Initialize an empty sha-chain for them, tracking the current pending
 	// revocation hash (we don't yet know the preimage so we can't add it
 	// to the chain).
@@ -1550,6 +1577,33 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	chanState := pendingReservation.partialState
 	chanState.FundingOutpoint = *req.fundingOutpoint
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
+
+	// We received funding_created, update the remotesigner.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := remotesigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType.IsTweakless(),
+	)
+	if err != nil {
+		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
+		return
+	}
 
 	// Now that we have the funding outpoint, we can generate both versions
 	// of the commitment transaction, and generate a signature for the
