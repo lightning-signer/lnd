@@ -3,11 +3,13 @@ package remotesigner
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/input"
@@ -131,6 +133,9 @@ func ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 	if !state.nodeIDValid {
 		return [32]byte{}, ErrRemoteSignerNodeIDNotSet
 	}
+	log.Debugf("ECDH request: nodeID %s, pubKey %s",
+		hex.EncodeToString(state.nodeID[:]),
+		hex.EncodeToString(pubKey.SerializeCompressed()))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -145,8 +150,10 @@ func ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 		log.Errorf("state.client.ECDH failed: %v", err)
 		return [32]byte{}, err
 	}
+
 	var secret [32]byte
 	copy(secret[:], rsp.SharedSecret.Data)
+	log.Debugf("ECDH response: secret=%s", hex.EncodeToString(secret[:]))
 	return secret, nil
 }
 
@@ -178,7 +185,8 @@ func signChannelAnnouncement(pubKey *btcec.PublicKey,
 	if !state.nodeIDValid {
 		return nil, ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("SignChannelAnnouncement: pubKey %s, msg %v",
+	log.Debugf("SignChannelAnnouncement request: nodeID=%s, pubKey=%s, msg=%v",
+		hex.EncodeToString(state.nodeID[:]),
 		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
 
 	return nil, fmt.Errorf("SignChannelAnnouncement UNIMPLEMENTED")
@@ -189,7 +197,8 @@ func signChannelUpdate(pubKey *btcec.PublicKey,
 	if !state.nodeIDValid {
 		return nil, ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("SignChannelUpdate: pubKey %s, msg %v",
+	log.Debugf("SignChannelUpdate request: nodeID=%s, pubKey=%s, msg=%v",
+		hex.EncodeToString(state.nodeID[:]),
 		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -210,6 +219,8 @@ func signChannelUpdate(pubKey *btcec.PublicKey,
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("SignChannelUpdate response: sig=%s",
+		hex.EncodeToString(rsp.Signature.Data))
 	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
 }
 
@@ -218,7 +229,8 @@ func signNodeAnnouncement(pubKey *btcec.PublicKey,
 	if !state.nodeIDValid {
 		return nil, ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("SignNodeAnnouncement: pubKey %s, msg %v",
+	log.Debugf("SignNodeAnnouncement request: nodeID=%s, pubKey=%s, msg=%v",
+		hex.EncodeToString(state.nodeID[:]),
 		hex.EncodeToString(pubKey.SerializeCompressed()), msg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -239,6 +251,8 @@ func signNodeAnnouncement(pubKey *btcec.PublicKey,
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("SignNodeAnnouncement response: sig=%s",
+		hex.EncodeToString(rsp.Signature.Data))
 	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
 }
 
@@ -253,30 +267,46 @@ func validateLocalNodePublicKey(pubKey *btcec.PublicKey) error {
 	return nil
 }
 
-func channelNonce(peerNodeID *btcec.PublicKey, pendingChanID [32]byte) []byte {
-	retval := peerNodeID.SerializeCompressed()
+func channelNonceInitial(peerNode *btcec.PublicKey,
+	pendingChanID [32]byte) []byte {
+	retval := peerNode.SerializeCompressed()
 	retval = append(retval, pendingChanID[:]...)
-	log.Debugf("channelNonce: %s", hex.EncodeToString(retval))
+	log.Debugf("channelNonceInitial: %s", hex.EncodeToString(retval))
 	return retval
 }
 
-func NewChannel(peerNodeID *btcec.PublicKey, pendingChanID [32]byte) error {
+func channelNoncePermanent(fundingOutpoint *wire.OutPoint) []byte {
+	var chanPointBuf bytes.Buffer
+	if _, err := chanPointBuf.Write(fundingOutpoint.Hash[:]); err != nil {
+		panic(fmt.Sprintf("channelNoncePermanent: hash write failed: %v", err))
+	}
+	if err := binary.Write(
+		&chanPointBuf, binary.BigEndian, fundingOutpoint.Index); err != nil {
+		panic(fmt.Sprintf("channelNoncePermanent: index write failed: %v", err))
+	}
+	retval := chanPointBuf.Bytes()
+	log.Debugf("channelNoncePermanent: %s", hex.EncodeToString(retval))
+	return retval
+}
+
+func NewChannel(peerNode *btcec.PublicKey, pendingChanID [32]byte) error {
 	if !state.nodeIDValid {
 		return ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("NewChannel request: peerNodeID=%s, pendingChanID=%s",
-		hex.EncodeToString(peerNodeID.SerializeCompressed()),
+	log.Debugf("NewChannel request: nodeID=%s, peerNodeID=%s, pendingChanID=%s",
+		hex.EncodeToString(state.nodeID[:]),
+		hex.EncodeToString(peerNode.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]))
 
-	channelNonce := channelNonce(peerNodeID, pendingChanID)
+	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	_, err := state.client.NewChannel(ctx,
 		&NewChannelRequest{
-			NodeId:       &NodeId{Data: state.nodeID[:]},
-			ChannelNonce: &ChannelNonce{Data: channelNonce},
+			NodeId:        &NodeId{Data: state.nodeID[:]},
+			ChannelNonce0: &ChannelNonce{Data: channelNonceInitial},
 		})
 	if err != nil {
 		return err
@@ -293,16 +323,18 @@ type ChannelBasepoints struct {
 	FundingPubkey  *btcec.PublicKey
 }
 
-func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
+func GetChannelBasepoints(peerNode *btcec.PublicKey,
 	pendingChanID [32]byte) (*ChannelBasepoints, error) {
 	if !state.nodeIDValid {
 		return nil, ErrRemoteSignerNodeIDNotSet
 	}
-	log.Debugf("GetChannelBasepoints request: peerNodeID=%s, pendingChanID=%s",
-		hex.EncodeToString(peerNodeID.SerializeCompressed()),
+	log.Debugf("GetChannelBasepoints request: "+
+		"nodeID=%s, peerNodeID=%s, pendingChanID=%s",
+		hex.EncodeToString(state.nodeID[:]),
+		hex.EncodeToString(peerNode.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]))
 
-	channelNonce := channelNonce(peerNodeID, pendingChanID)
+	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -310,7 +342,7 @@ func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
 	rsp, err := state.client.GetChannelBasepoints(ctx,
 		&GetChannelBasepointsRequest{
 			NodeId:       &NodeId{Data: state.nodeID[:]},
-			ChannelNonce: &ChannelNonce{Data: channelNonce},
+			ChannelNonce: &ChannelNonce{Data: channelNonceInitial},
 		})
 	if err != nil {
 		return nil, err
@@ -363,4 +395,102 @@ func GetChannelBasepoints(peerNodeID *btcec.PublicKey,
 		DelayedPayment: delayPoint,
 		FundingPubkey:  fundPoint,
 	}, nil
+}
+
+func ReadyChannel(
+	peerNode *btcec.PublicKey,
+	pendingChanID [32]byte,
+	isOutbound bool,
+	channelValueSat uint64,
+	pushValueMsat uint64,
+	fundingOutpoint *wire.OutPoint,
+	localToSelfDelay uint16,
+	localShutdownScript []byte,
+	remoteRevocationBasepoint *btcec.PublicKey,
+	remotePaymentBasepoint *btcec.PublicKey,
+	remoteHtlcBasepoint *btcec.PublicKey,
+	remoteDelayedPaymentBasepoint *btcec.PublicKey,
+	remoteFundingPubkey *btcec.PublicKey,
+	remoteToSelfDelay uint16,
+	remoteShutdownScript []byte,
+	optionStaticRemotekey bool,
+) error {
+	if !state.nodeIDValid {
+		return ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("ReadyChannel request: "+
+		"nodeID=%s, "+
+		"peerNodeID=%s, pendingChanID=%s, "+
+		"isOutbound=%v, channelValueSat=%v, "+
+		"pushValueMsat=%v, fundingOutpoint=%v, "+
+		"localToSelfDelay=%v, localShutdownScript=%s, "+
+		"remoteRevocationBasepoint=%s, "+
+		"remotePaymentBasepoint=%s, "+
+		"remoteHtlcBasepoint=%s, "+
+		"remoteDelayedPaymentBasepoint=%s, "+
+		"remoteFundingPubkey=%s, "+
+		"remoteToSelfDelay=%v, "+
+		"remoteShutdownScript=%s, "+
+		"optionStaticRemotekey=%v",
+		hex.EncodeToString(state.nodeID[:]),
+		hex.EncodeToString(peerNode.SerializeCompressed()),
+		hex.EncodeToString(pendingChanID[:]),
+		isOutbound, channelValueSat,
+		pushValueMsat, fundingOutpoint,
+		localToSelfDelay, hex.EncodeToString(localShutdownScript),
+		hex.EncodeToString(remoteRevocationBasepoint.SerializeCompressed()),
+		hex.EncodeToString(remotePaymentBasepoint.SerializeCompressed()),
+		hex.EncodeToString(remoteHtlcBasepoint.SerializeCompressed()),
+		hex.EncodeToString(remoteDelayedPaymentBasepoint.SerializeCompressed()),
+		hex.EncodeToString(remoteFundingPubkey.SerializeCompressed()),
+		remoteToSelfDelay,
+		hex.EncodeToString(remoteShutdownScript),
+		optionStaticRemotekey)
+
+	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
+	channelNoncePermanent := channelNoncePermanent(fundingOutpoint)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := state.client.ReadyChannel(ctx,
+		&ReadyChannelRequest{
+			NodeId:             &NodeId{Data: state.nodeID[:]},
+			ChannelNonce0:      &ChannelNonce{Data: channelNonceInitial},
+			OptionChannelNonce: &ChannelNonce{Data: channelNoncePermanent},
+			IsOutbound:         isOutbound,
+			ChannelValueSat:    channelValueSat,
+			PushValueMsat:      pushValueMsat,
+			FundingOutpoint: &Outpoint{
+				Txid:  fundingOutpoint.Hash[:],
+				Index: fundingOutpoint.Index,
+			},
+			LocalToSelfDelay:    uint32(localToSelfDelay),
+			LocalShutdownScript: localShutdownScript,
+			RemoteBasepoints: &Basepoints{
+				Revocation: &PubKey{
+					Data: remoteRevocationBasepoint.SerializeCompressed(),
+				},
+				Payment: &PubKey{
+					Data: remotePaymentBasepoint.SerializeCompressed(),
+				},
+				Htlc: &PubKey{
+					Data: remoteHtlcBasepoint.SerializeCompressed(),
+				},
+				DelayedPayment: &PubKey{
+					Data: remoteDelayedPaymentBasepoint.SerializeCompressed(),
+				},
+				FundingPubkey: &PubKey{
+					Data: remoteFundingPubkey.SerializeCompressed(),
+				},
+			},
+			RemoteToSelfDelay:     uint32(remoteToSelfDelay),
+			RemoteShutdownScript:  remoteShutdownScript,
+			OptionStaticRemotekey: optionStaticRemotekey,
+		})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

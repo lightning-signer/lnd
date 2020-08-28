@@ -3,6 +3,7 @@ package lnwallet
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -823,9 +824,16 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 
 	// Compare the remotesigner's returned basepoints to the ones derived here.
 	oc := reservation.ourContribution
-	walletLog.Debugf("KeyDescriptors = [%v, %v, %v, %v, %v]",
-		oc.MultiSigKey, oc.RevocationBasePoint, oc.HtlcBasePoint,
-		oc.PaymentBasePoint, oc.DelayBasePoint)
+	walletLog.Debugf("        MultiSigKey=%v %s", oc.MultiSigKey,
+		hex.EncodeToString(oc.MultiSigKey.PubKey.SerializeCompressed()))
+	walletLog.Debugf("RevocationBasePoint=%v %s", oc.RevocationBasePoint,
+		hex.EncodeToString(oc.RevocationBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("      HtlcBasePoint=%v %s", oc.HtlcBasePoint,
+		hex.EncodeToString(oc.HtlcBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("   PaymentBasePoint=%v %s", oc.PaymentBasePoint,
+		hex.EncodeToString(oc.PaymentBasePoint.PubKey.SerializeCompressed()))
+	walletLog.Debugf("     DelayBasePoint=%v %s", oc.DelayBasePoint,
+		hex.EncodeToString(oc.DelayBasePoint.PubKey.SerializeCompressed()))
 	if !bytes.Equal(
 		oc.MultiSigKey.PubKey.SerializeCompressed(),
 		bps.FundingPubkey.SerializeCompressed()) {
@@ -1172,6 +1180,33 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 				},
 			)
 		}
+	}
+
+	// We received accept_channel, update the remotesigner.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := remotesigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType.IsTweakless(),
+	)
+	if err != nil {
+		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
+		return
 	}
 
 	// Initialize an empty sha-chain for them, tracking the current pending
@@ -1542,6 +1577,33 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	chanState := pendingReservation.partialState
 	chanState.FundingOutpoint = *req.fundingOutpoint
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
+
+	// We received funding_created, update the remotesigner.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := remotesigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType.IsTweakless(),
+	)
+	if err != nil {
+		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
+		return
+	}
 
 	// Now that we have the funding outpoint, we can generate both versions
 	// of the commitment transaction, and generate a signature for the
