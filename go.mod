@@ -76,6 +76,8 @@ require (
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )
 
+replace github.com/btcsuite/btcutil => github.com/lightning-signer/btcutil v1.0.3-0.20200901142611-b10d52633c80
+
 replace github.com/lightningnetwork/lnd/ticker => ./ticker
 
 replace github.com/lightningnetwork/lnd/queue => ./queue
