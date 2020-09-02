@@ -1,5 +1,8 @@
 module github.com/lightningnetwork/lnd
 
+replace github.com/btcsuite/btcutil => /home/user/lightning-signer/btcutil
+replace github.com/btcsuite/btcwallet => /home/user/lightning-signer/btcwallet
+
 require (
 	git.schwanenlied.me/yawning/bsaes.git v0.0.0-20180720073208-c0276d75487e // indirect
 	github.com/NebulousLabs/fastrand v0.0.0-20181203155948-6fb6489aac4e // indirect

@@ -10,7 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/hdkeychain"
+	// "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lnwire"
@@ -51,26 +51,30 @@ func Initialize() error {
 }
 
 func InitNode(networkName string, seed0 []byte, debugCaller string) ([]byte, error) {
-	var useSeed []byte
-
 	if state.nodeIDValid {
 		return nil, fmt.Errorf("InitNode called w/ nodeID already set: %v",
 			hex.EncodeToString(state.nodeID[:]))
 	}
 
 	// If no entropy was supplied make some up.
+	var useSeed []byte
 	if seed0 != nil {
 		useSeed = seed0
 		log.Infof("InitNode: supplied seed %s for %s",
 			hex.EncodeToString(useSeed), debugCaller)
 	} else {
-		var err error
-		useSeed, err = hdkeychain.GenerateSeed(
-			hdkeychain.RecommendedSeedLen)
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("InitNode: generated seed %s for %s",
+		// var err error
+		// useSeed, err = hdkeychain.GenerateSeed(
+		// 	hdkeychain.RecommendedSeedLen)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// log.Infof("InitNode: generated seed %s for %s",
+		// 	hex.EncodeToString(useSeed), debugCaller)
+		useSeed, _ = hex.DecodeString(
+			"4bbd5b4958b7f651cabf2a30452cc980e8de9345ebae537874d45bcb1c926565")
+		// "4bbd5b4958b7f651cabf2a30452cc980e8de9345ebae537874d45bcb1c920000")
+		log.Infof("InitNode: FORCED seed %s for %s",
 			hex.EncodeToString(useSeed), debugCaller)
 	}
 
