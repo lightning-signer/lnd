@@ -1202,6 +1202,18 @@ func generateRemoteCommitmentWitnessScripts(
 	return witscripts, nil
 }
 
+func commitmentType(
+	chanType channeldb.ChannelType,
+) remotesigner.ReadyChannelRequest_CommitmentType {
+	if chanType.HasAnchors() {
+		return remotesigner.ReadyChannelRequest_ANCHORS
+	} else if chanType.IsTweakless() {
+		return remotesigner.ReadyChannelRequest_STATIC_REMOTEKEY
+	} else {
+		return remotesigner.ReadyChannelRequest_LEGACY
+	}
+}
+
 // handleChanPointReady continues the funding process once the channel point
 // is known and the funding transaction can be completed.
 func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
@@ -1277,7 +1289,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType.IsTweakless(),
+		commitmentType(pstate.ChanType),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
@@ -1703,7 +1715,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType.IsTweakless(),
+		commitmentType(pstate.ChanType),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)

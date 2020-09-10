@@ -413,7 +413,7 @@ func ReadyChannel(
 	remoteFundingPubkey *btcec.PublicKey,
 	remoteToSelfDelay uint16,
 	remoteShutdownScript []byte,
-	optionStaticRemotekey bool,
+	commitmentType ReadyChannelRequest_CommitmentType,
 ) error {
 	if !state.nodeIDValid {
 		return ErrRemoteSignerNodeIDNotSet
@@ -431,7 +431,7 @@ func ReadyChannel(
 		"remoteFundingPubkey=%s, "+
 		"remoteToSelfDelay=%v, "+
 		"remoteShutdownScript=%s, "+
-		"optionStaticRemotekey=%v",
+		"commitmentType=%v",
 		hex.EncodeToString(state.nodeID[:]),
 		hex.EncodeToString(peerNode.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]),
@@ -445,7 +445,7 @@ func ReadyChannel(
 		hex.EncodeToString(remoteFundingPubkey.SerializeCompressed()),
 		remoteToSelfDelay,
 		hex.EncodeToString(remoteShutdownScript),
-		optionStaticRemotekey)
+		commitmentType)
 
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 	channelNoncePermanent := channelNoncePermanent(fundingOutpoint)
@@ -484,9 +484,9 @@ func ReadyChannel(
 					Data: remoteFundingPubkey.SerializeCompressed(),
 				},
 			},
-			RemoteToSelfDelay:     uint32(remoteToSelfDelay),
-			RemoteShutdownScript:  remoteShutdownScript,
-			OptionStaticRemotekey: optionStaticRemotekey,
+			RemoteToSelfDelay:    uint32(remoteToSelfDelay),
+			RemoteShutdownScript: remoteShutdownScript,
+			CommitmentType:       commitmentType,
 		})
 	if err != nil {
 		return err
