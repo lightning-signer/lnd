@@ -413,7 +413,7 @@ func ReadyChannel(
 	remoteFundingPubkey *btcec.PublicKey,
 	remoteToSelfDelay uint16,
 	remoteShutdownScript []byte,
-	optionStaticRemotekey bool,
+	commitmentType ReadyChannelRequest_CommitmentType,
 ) error {
 	if !state.nodeIDValid {
 		return ErrRemoteSignerNodeIDNotSet
@@ -431,7 +431,7 @@ func ReadyChannel(
 		"remoteFundingPubkey=%s, "+
 		"remoteToSelfDelay=%v, "+
 		"remoteShutdownScript=%s, "+
-		"optionStaticRemotekey=%v",
+		"commitmentType=%v",
 		hex.EncodeToString(state.nodeID[:]),
 		hex.EncodeToString(peerNode.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]),
@@ -445,7 +445,7 @@ func ReadyChannel(
 		hex.EncodeToString(remoteFundingPubkey.SerializeCompressed()),
 		remoteToSelfDelay,
 		hex.EncodeToString(remoteShutdownScript),
-		optionStaticRemotekey)
+		commitmentType)
 
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 	channelNoncePermanent := channelNoncePermanent(fundingOutpoint)
@@ -484,13 +484,86 @@ func ReadyChannel(
 					Data: remoteFundingPubkey.SerializeCompressed(),
 				},
 			},
-			RemoteToSelfDelay:     uint32(remoteToSelfDelay),
-			RemoteShutdownScript:  remoteShutdownScript,
-			OptionStaticRemotekey: optionStaticRemotekey,
+			RemoteToSelfDelay:    uint32(remoteToSelfDelay),
+			RemoteShutdownScript: remoteShutdownScript,
+			CommitmentType:       commitmentType,
 		})
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func SignRemoteCommitment(
+	fundingOutpoint *wire.OutPoint,
+	channelValueSat uint64,
+	remotePerCommitPoint *btcec.PublicKey,
+	theirCommitTx *wire.MsgTx,
+	witscripts [][]byte,
+) (input.Signature, error) {
+	if !state.nodeIDValid {
+		return nil, ErrRemoteSignerNodeIDNotSet
+	}
+	log.Debugf("SignRemoteCommitment request: "+
+		"nodeID=%s, "+
+		"fundingOutpoint=%v, "+
+		"channelValueSat=%v, "+
+		"remotePerCommitPoint=%s, "+
+		"theirCommitTx=%v",
+		hex.EncodeToString(state.nodeID[:]),
+		fundingOutpoint,
+		channelValueSat,
+		hex.EncodeToString(remotePerCommitPoint.SerializeCompressed()),
+		theirCommitTx,
+	)
+
+	channelNonce := channelNoncePermanent(fundingOutpoint)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	var rawTxBytes bytes.Buffer
+	err := theirCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(theirCommitTx.TxIn) != 1 {
+		return nil, fmt.Errorf("commitment tx must have one input")
+	}
+	var inputDescs []*InputDescriptor
+	inputDescs = append(inputDescs, &InputDescriptor{
+		PrevOutput: &TxOut{
+			ValueSat: int64(channelValueSat),
+		},
+	})
+	var outputDescs []*OutputDescriptor
+	for ndx, _ := range theirCommitTx.TxOut {
+		outputDescs = append(outputDescs, &OutputDescriptor{
+			Witscript: witscripts[ndx],
+		})
+	}
+
+	rsp, err := state.client.SignRemoteCommitmentTx(ctx,
+		&SignRemoteCommitmentTxRequest{
+			NodeId:       &NodeId{Data: state.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: channelNonce},
+			RemotePerCommitPoint: &PubKey{
+				Data: remotePerCommitPoint.SerializeCompressed(),
+			},
+			Tx: &Transaction{
+				RawTxBytes:  rawTxBytes.Bytes(),
+				InputDescs:  inputDescs,
+				OutputDescs: outputDescs,
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	sig := rsp.Signature.Data
+
+	// Chop off the sighash flag at the end of the signature.
+	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
 }

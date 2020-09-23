@@ -1127,6 +1127,93 @@ func (l *LightningWallet) handleContributionMsg(req *addContributionMsg) {
 	})
 }
 
+// The remotesigner needs the witness script to properly validate the
+// the transaction.  This helper returns an array of witness scripts
+// one for each of the outputs of the transaction.
+func generateRemoteCommitmentWitnessScripts(
+	theirCommitPoint *btcec.PublicKey,
+	chanType channeldb.ChannelType,
+	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
+	theirCommitTx *wire.MsgTx) ([][]byte, error) {
+
+	// A Slice to byte array helper so we can use a map.
+	s2a := func(slice []byte) [32]byte {
+		var hash [32]byte
+		copy(hash[:], slice)
+		return hash
+	}
+
+	// Since the outputs are not in a particular order we will need
+	// to match the witscripts by their pk_hash values.
+	witscriptMap := make(map[[32]byte][]byte)
+
+	remoteCommitmentKeys := DeriveCommitmentKeys(
+		theirCommitPoint,
+		false,
+		chanType,
+		localChanCfg,
+		remoteChanCfg,
+	)
+
+	// Derive the to_self output witscript and hash.
+	toLocalRedeemScript, err := input.CommitScriptToSelf(
+		uint32(remoteChanCfg.CsvDelay),
+		remoteCommitmentKeys.ToLocalKey,
+		remoteCommitmentKeys.RevocationKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+	toLocalScriptHash, err := input.WitnessScriptHash(
+		toLocalRedeemScript,
+	)
+	if err != nil {
+		return nil, err
+	}
+	witscriptMap[s2a(toLocalScriptHash)] = toLocalRedeemScript
+
+	// Derive the to_remote output witscript and hash.
+	toRemoteScript, _, err := CommitScriptToRemote(
+		chanType, remoteCommitmentKeys.ToRemoteKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+	witscriptMap[s2a(toRemoteScript.PkScript)] = toRemoteScript.WitnessScript
+
+	// Add any anchor witscripts and hashes..
+	if chanType.HasAnchors() {
+		localAnchor, remoteAnchor, err := CommitScriptAnchors(
+			localChanCfg, remoteChanCfg,
+		)
+		if err != nil {
+			return nil, err
+		}
+		witscriptMap[s2a(localAnchor.PkScript)] = localAnchor.WitnessScript
+		witscriptMap[s2a(remoteAnchor.PkScript)] = remoteAnchor.WitnessScript
+	}
+
+	// Scan the transaction, return the witness script for the
+	// matching outputs and []byte{} placeholders for the others.
+	var witscripts [][]byte
+	for _, txi := range theirCommitTx.TxOut {
+		witscripts = append(witscripts, witscriptMap[s2a(txi.PkScript)])
+	}
+	return witscripts, nil
+}
+
+func commitmentType(
+	chanType channeldb.ChannelType,
+) remotesigner.ReadyChannelRequest_CommitmentType {
+	if chanType.HasAnchors() {
+		return remotesigner.ReadyChannelRequest_ANCHORS
+	} else if chanType.IsTweakless() {
+		return remotesigner.ReadyChannelRequest_STATIC_REMOTEKEY
+	} else {
+		return remotesigner.ReadyChannelRequest_LEGACY
+	}
+}
+
 // handleChanPointReady continues the funding process once the channel point
 // is known and the funding transaction can be completed.
 func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
@@ -1202,7 +1289,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType.IsTweakless(),
+		commitmentType(pstate.ChanType),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
@@ -1316,6 +1403,34 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		return
 	}
 	pendingReservation.ourCommitmentSig = sigTheirCommit
+
+	// Generate the same signature using the remotesigner and compare.
+	witscripts, err := generateRemoteCommitmentWitnessScripts(
+		theirs.FirstCommitmentPoint,
+		pstate.ChanType,
+		ours.ChannelConfig,
+		theirs.ChannelConfig,
+		theirCommitTx,
+	)
+	if err != nil {
+		req.err <- err
+		return
+	}
+	rsig, err := remotesigner.SignRemoteCommitment(
+		&pstate.FundingOutpoint,
+		uint64(pstate.Capacity),
+		theirs.FirstCommitmentPoint,
+		theirCommitTx,
+		witscripts,
+	)
+	if err != nil {
+		req.err <- err
+		return
+	}
+	if !bytes.Equal(rsig.Serialize(), sigTheirCommit.Serialize()) {
+		req.err <- fmt.Errorf("remotesigner SignRemoteCommitment mismatch")
+		return
+	}
 
 	req.err <- nil
 }
@@ -1579,6 +1694,8 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
 
 	// We received funding_created, update the remotesigner.
+	// FIXME - This should probably be moved to where open_channel
+	// is handled.
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
@@ -1598,7 +1715,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType.IsTweakless(),
+		commitmentType(pstate.ChanType),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
@@ -1713,6 +1830,34 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		return
 	}
 	pendingReservation.ourCommitmentSig = sigTheirCommit
+
+	// Generate the same signature using the remotesigner and compare.
+	witscripts, err := generateRemoteCommitmentWitnessScripts(
+		theirs.FirstCommitmentPoint,
+		pstate.ChanType,
+		ours.ChannelConfig,
+		theirs.ChannelConfig,
+		theirCommitTx,
+	)
+	if err != nil {
+		req.err <- err
+		return
+	}
+	rsig, err := remotesigner.SignRemoteCommitment(
+		&pstate.FundingOutpoint,
+		uint64(pstate.Capacity),
+		theirs.FirstCommitmentPoint,
+		theirCommitTx,
+		witscripts,
+	)
+	if err != nil {
+		req.err <- err
+		return
+	}
+	if !bytes.Equal(rsig.Serialize(), sigTheirCommit.Serialize()) {
+		req.err <- fmt.Errorf("remotesigner SignRemoteCommitment mismatch")
+		return
+	}
 
 	_, bestHeight, err := l.Cfg.ChainIO.GetBestBlock()
 	if err != nil {
