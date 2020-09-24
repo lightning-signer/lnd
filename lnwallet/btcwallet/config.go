@@ -10,6 +10,8 @@ import (
 	"github.com/btcsuite/btcwallet/chain"
 	"github.com/btcsuite/btcwallet/wallet"
 
+	"github.com/lightningnetwork/lnd/lnwallet"
+
 	// This is required to register bdb as a valid walletdb driver. In the
 	// init function of the package, it registers itself. The import is used
 	// to activate the side effects w/o actually binding the package name to
@@ -75,6 +77,11 @@ type Config struct {
 	// encrypted at all, in which case it should be attempted to be loaded
 	// normally when creating the BtcWallet.
 	Wallet *wallet.Wallet
+
+	// TEMPORARY - The remotesigner needs to share the same seed as
+	// the local wallet for integration "shadow" testing. Remove this
+	// when no longer needed.
+	RemoteSigner lnwallet.RemoteSigner
 
 	// NoFreelistSync, if true, prevents the database from syncing its
 	// freelist to disk, resulting in improved performance at the expense of

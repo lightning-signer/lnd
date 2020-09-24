@@ -41,6 +41,9 @@ type Config struct {
 	// update the commitment state.
 	Signer input.Signer
 
+	// RemoteSigner is used to remotely generate signatures.
+	RemoteSigner RemoteSigner
+
 	// FeeEstimator is the implementation that the wallet will use for the
 	// calculation of on-chain transaction fees.
 	FeeEstimator chainfee.Estimator

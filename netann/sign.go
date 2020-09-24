@@ -9,7 +9,6 @@ import (
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/lightningnetwork/lnd/remotesigner"
 )
 
 // SignAnnouncement signs any type of gossip message that is announced on the
@@ -41,7 +40,8 @@ func SignAnnouncement(signer lnwallet.MessageSigner, pubKey *btcec.PublicKey,
 		return nil, err
 	}
 
-	rmtSignature, err := remotesigner.SignAnnouncement(pubKey, msg)
+	rmtSignature, err :=
+		lnwallet.GetRemoteSigner().SignAnnouncement(pubKey, msg)
 	if err != nil {
 		return nil, err
 	}

@@ -26,7 +26,6 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwallet/chanvalidate"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/lightningnetwork/lnd/remotesigner"
 	"github.com/lightningnetwork/lnd/shachain"
 )
 
@@ -295,6 +294,8 @@ type LightningWallet struct {
 	// double spend inputs across each other.
 	coinSelectMtx sync.RWMutex
 
+	remoteSigner RemoteSigner
+
 	// All messages to the wallet are to be sent across this channel.
 	msgChan chan interface{}
 
@@ -333,6 +334,7 @@ func NewLightningWallet(Cfg Config) (*LightningWallet, error) {
 		Cfg:              Cfg,
 		SecretKeyRing:    Cfg.SecretKeyRing,
 		WalletController: Cfg.WalletController,
+		remoteSigner:     Cfg.RemoteSigner,
 		msgChan:          make(chan interface{}, msgBufferSize),
 		nextFundingID:    0,
 		fundingLimbo:     make(map[uint64]*ChannelReservation),
@@ -810,13 +812,13 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	}
 
 	// Fetch the basepoints from the remotesigner.
-	err = remotesigner.NewChannel(
+	err = l.remoteSigner.NewChannel(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
 	}
 
-	bps, err := remotesigner.GetChannelBasepoints(
+	bps, err := l.remoteSigner.GetChannelBasepoints(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
@@ -1202,18 +1204,6 @@ func generateRemoteCommitmentWitnessScripts(
 	return witscripts, nil
 }
 
-func commitmentType(
-	chanType channeldb.ChannelType,
-) remotesigner.ReadyChannelRequest_CommitmentType {
-	if chanType.HasAnchors() {
-		return remotesigner.ReadyChannelRequest_ANCHORS
-	} else if chanType.IsTweakless() {
-		return remotesigner.ReadyChannelRequest_STATIC_REMOTEKEY
-	} else {
-		return remotesigner.ReadyChannelRequest_LEGACY
-	}
-}
-
 // handleChanPointReady continues the funding process once the channel point
 // is known and the funding transaction can be completed.
 func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
@@ -1273,7 +1263,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := remotesigner.ReadyChannel(
+	err := l.remoteSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1289,7 +1279,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		commitmentType(pstate.ChanType),
+		pstate.ChanType,
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
@@ -1416,7 +1406,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		req.err <- err
 		return
 	}
-	rsig, err := remotesigner.SignRemoteCommitment(
+	rsig, err := l.remoteSigner.SignRemoteCommitment(
 		&pstate.FundingOutpoint,
 		uint64(pstate.Capacity),
 		theirs.FirstCommitmentPoint,
@@ -1699,7 +1689,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := remotesigner.ReadyChannel(
+	err := l.remoteSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1715,7 +1705,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		commitmentType(pstate.ChanType),
+		pstate.ChanType,
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("remotesigner ReadyChannel failed: %v", err)
@@ -1843,7 +1833,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		req.err <- err
 		return
 	}
-	rsig, err := remotesigner.SignRemoteCommitment(
+	rsig, err := l.remoteSigner.SignRemoteCommitment(
 		&pstate.FundingOutpoint,
 		uint64(pstate.Capacity),
 		theirs.FirstCommitmentPoint,

@@ -164,7 +164,8 @@ type chainControl struct {
 func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	privateWalletPw, publicWalletPw []byte, birthday time.Time,
 	recoveryWindow uint32, wallet *wallet.Wallet,
-	neutrinoCS *neutrino.ChainService) (*chainControl, error) {
+	neutrinoCS *neutrino.ChainService,
+	remoteSigner lnwallet.RemoteSigner) (*chainControl, error) {
 
 	// Set the RPC config from the "home" chain. Multi-chain isn't yet
 	// active, so we'll restrict usage to a particular chain for now.
@@ -215,6 +216,7 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		NetParams:      activeNetParams.Params,
 		CoinType:       activeNetParams.CoinType,
 		Wallet:         wallet,
+		RemoteSigner:   remoteSigner, // TEMPORARY
 	}
 
 	var err error
@@ -528,6 +530,7 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		Notifier:           cc.chainNotifier,
 		WalletController:   wc,
 		Signer:             cc.signer,
+		RemoteSigner:       remoteSigner,
 		FeeEstimator:       cc.feeEstimator,
 		SecretKeyRing:      keyRing,
 		ChainIO:            cc.chainIO,

@@ -364,12 +364,14 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 		return getListeners()
 	}
 
-	err = remotesigner.Initialize()
+	// TODO - add config interface for remotesigner address.
+	remoteSigner, err := remotesigner.NewRemoteSigner("localhost:50051")
 	if err != nil {
 		err := fmt.Errorf("unable to initialize remotesigner: %v", err)
 		ltndLog.Error(err)
 		return err
 	}
+	lnwallet.SetRemoteSigner(remoteSigner)
 
 	// We wait until the user provides a password over RPC. In case lnd is
 	// started with the --noseedbackup flag, we use the default password
@@ -378,6 +380,7 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 		params, err := waitForWalletPassword(
 			cfg, cfg.RESTListeners, serverOpts, restDialOpts,
 			restProxyDest, tlsCfg, walletUnlockerListeners,
+			remoteSigner,
 		)
 		if err != nil {
 			err := fmt.Errorf("unable to set up wallet password "+
@@ -446,7 +449,7 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 	activeChainControl, err := newChainControlFromConfig(
 		cfg, localChanDB, remoteChanDB, privateWalletPw, publicWalletPw,
 		walletInitParams.Birthday, walletInitParams.RecoveryWindow,
-		walletInitParams.Wallet, neutrinoCS,
+		walletInitParams.Wallet, neutrinoCS, remoteSigner,
 	)
 	if err != nil {
 		err := fmt.Errorf("unable to create chain control: %v", err)
@@ -601,7 +604,7 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 	server, err := newServer(
 		cfg, cfg.Listeners, localChanDB, remoteChanDB, towerClientDB,
 		activeChainControl, &idKeyDesc, walletInitParams.ChansToRestore,
-		chainedAcceptor, torController,
+		chainedAcceptor, torController, remoteSigner,
 	)
 	if err != nil {
 		err := fmt.Errorf("unable to create server: %v", err)
@@ -953,7 +956,8 @@ type WalletUnlockParams struct {
 func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 	serverOpts []grpc.ServerOption, restDialOpts []grpc.DialOption,
 	restProxyDest string, tlsConf *tls.Config,
-	getListeners rpcListeners) (*WalletUnlockParams, error) {
+	getListeners rpcListeners,
+	remoteSigner lnwallet.RemoteSigner) (*WalletUnlockParams, error) {
 
 	// Start a gRPC server listening for HTTP/2 connections, solely used
 	// for getting the encryption password from the client.
@@ -1087,7 +1091,7 @@ func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 		// Let the remotesigner use the same seed so it can shadow
 		// internal signature generation.  If seed is empty one
 		// will be randomly generated and returned.
-		nonNilSeed, err := remotesigner.InitNode(
+		nonNilSeed, err := remoteSigner.InitNode(
 			cfg.networkName(), cipherSeed.Entropy[:], "WalletUnlockParams")
 		if err != nil {
 			return nil, fmt.Errorf("remotesigner.InitNode failed: %v", err)

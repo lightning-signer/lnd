@@ -1,4 +1,9 @@
 
+Generate the stubs:
+
+    cd remotesigner
+    ./gen_proto.sh
+
 Run all the tests:
 
     make itest timeout=240m |& tee itest.log

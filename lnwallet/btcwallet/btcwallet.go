@@ -23,7 +23,6 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
-	"github.com/lightningnetwork/lnd/remotesigner"
 )
 
 const (
@@ -118,7 +117,7 @@ func New(cfg Config) (*BtcWallet, error) {
 			// Let the remotesigner use the same seed so it can shadow
 			// internal signature generation.  If seed is empty one
 			// will be created from entropy and returned.
-			nonNilSeed, err := remotesigner.InitNode(
+			nonNilSeed, err := cfg.RemoteSigner.InitNode(
 				networkName, cfg.HdSeed, "btcwallet.New")
 			if err != nil {
 				return nil, err
