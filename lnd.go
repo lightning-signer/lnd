@@ -449,7 +449,8 @@ func Main(cfg *Config, lisCfg ListenerCfg, shutdownChan <-chan struct{}) error {
 	activeChainControl, err := newChainControlFromConfig(
 		cfg, localChanDB, remoteChanDB, privateWalletPw, publicWalletPw,
 		walletInitParams.Birthday, walletInitParams.RecoveryWindow,
-		walletInitParams.Wallet, neutrinoCS, remoteSigner,
+		walletInitParams.Wallet, neutrinoCS,
+		remoteSigner, remoteSigner, remoteSigner,
 	)
 	if err != nil {
 		err := fmt.Errorf("unable to create chain control: %v", err)

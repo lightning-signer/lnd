@@ -165,6 +165,8 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	privateWalletPw, publicWalletPw []byte, birthday time.Time,
 	recoveryWindow uint32, wallet *wallet.Wallet,
 	neutrinoCS *neutrino.ChainService,
+	nodeContextSigner lnwallet.NodeContextSigner,
+	channelContextSigner lnwallet.ChannelContextSigner,
 	remoteSigner lnwallet.RemoteSigner) (*chainControl, error) {
 
 	// Set the RPC config from the "home" chain. Multi-chain isn't yet
@@ -526,16 +528,17 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
 	walletCfg := lnwallet.Config{
-		Database:           remoteDB,
-		Notifier:           cc.chainNotifier,
-		WalletController:   wc,
-		Signer:             cc.signer,
-		RemoteSigner:       remoteSigner,
-		FeeEstimator:       cc.feeEstimator,
-		SecretKeyRing:      keyRing,
-		ChainIO:            cc.chainIO,
-		DefaultConstraints: channelConstraints,
-		NetParams:          *activeNetParams.Params,
+		Database:             remoteDB,
+		Notifier:             cc.chainNotifier,
+		WalletController:     wc,
+		Signer:               cc.signer,
+		NodeContextSigner:    nodeContextSigner,
+		ChannelContextSigner: channelContextSigner,
+		FeeEstimator:         cc.feeEstimator,
+		SecretKeyRing:        keyRing,
+		ChainIO:              cc.chainIO,
+		DefaultConstraints:   channelConstraints,
+		NetParams:            *activeNetParams.Params,
 	}
 	lnWallet, err := lnwallet.NewLightningWallet(walletCfg)
 	if err != nil {

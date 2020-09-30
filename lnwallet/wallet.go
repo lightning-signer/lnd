@@ -294,7 +294,8 @@ type LightningWallet struct {
 	// double spend inputs across each other.
 	coinSelectMtx sync.RWMutex
 
-	remoteSigner RemoteSigner
+	nodeContextSigner    NodeContextSigner
+	channelContextSigner ChannelContextSigner
 
 	// All messages to the wallet are to be sent across this channel.
 	msgChan chan interface{}
@@ -331,16 +332,17 @@ type LightningWallet struct {
 func NewLightningWallet(Cfg Config) (*LightningWallet, error) {
 
 	return &LightningWallet{
-		Cfg:              Cfg,
-		SecretKeyRing:    Cfg.SecretKeyRing,
-		WalletController: Cfg.WalletController,
-		remoteSigner:     Cfg.RemoteSigner,
-		msgChan:          make(chan interface{}, msgBufferSize),
-		nextFundingID:    0,
-		fundingLimbo:     make(map[uint64]*ChannelReservation),
-		lockedOutPoints:  make(map[wire.OutPoint]struct{}),
-		fundingIntents:   make(map[[32]byte]chanfunding.Intent),
-		quit:             make(chan struct{}),
+		Cfg:                  Cfg,
+		SecretKeyRing:        Cfg.SecretKeyRing,
+		WalletController:     Cfg.WalletController,
+		nodeContextSigner:    Cfg.NodeContextSigner,
+		channelContextSigner: Cfg.ChannelContextSigner,
+		msgChan:              make(chan interface{}, msgBufferSize),
+		nextFundingID:        0,
+		fundingLimbo:         make(map[uint64]*ChannelReservation),
+		lockedOutPoints:      make(map[wire.OutPoint]struct{}),
+		fundingIntents:       make(map[[32]byte]chanfunding.Intent),
+		quit:                 make(chan struct{}),
 	}, nil
 }
 
@@ -812,13 +814,13 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	}
 
 	// Fetch the basepoints from the remotesigner.
-	err = l.remoteSigner.NewChannel(
+	err = l.channelContextSigner.NewChannel(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
 	}
 
-	bps, err := l.remoteSigner.GetChannelBasepoints(
+	bps, err := l.channelContextSigner.GetChannelBasepoints(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
@@ -1263,7 +1265,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.remoteSigner.ReadyChannel(
+	err := l.channelContextSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1406,7 +1408,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		req.err <- err
 		return
 	}
-	rsig, err := l.remoteSigner.SignRemoteCommitment(
+	rsig, err := l.channelContextSigner.SignRemoteCommitment(
 		&pstate.FundingOutpoint,
 		uint64(pstate.Capacity),
 		theirs.FirstCommitmentPoint,
@@ -1689,7 +1691,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.remoteSigner.ReadyChannel(
+	err := l.channelContextSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1833,7 +1835,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		req.err <- err
 		return
 	}
-	rsig, err := l.remoteSigner.SignRemoteCommitment(
+	rsig, err := l.channelContextSigner.SignRemoteCommitment(
 		&pstate.FundingOutpoint,
 		uint64(pstate.Capacity),
 		theirs.FirstCommitmentPoint,
