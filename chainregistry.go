@@ -28,6 +28,7 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/input"
+	"github.com/lightningnetwork/lnd/internalsigner"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lncfg"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -138,6 +139,8 @@ type chainControl struct {
 	feeEstimator chainfee.Estimator
 
 	signer input.Signer
+
+	channelContextSigner lnwallet.ChannelContextSigner
 
 	keyRing keychain.SecretKeyRing
 
@@ -513,8 +516,11 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		return nil, err
 	}
 
+	internalSigner := internalsigner.NewInternalSigner(wc)
+
 	cc.msgSigner = wc
 	cc.signer = wc
+	cc.channelContextSigner = internalSigner
 	cc.chainIO = wc
 	cc.wc = wc
 
@@ -532,15 +538,16 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
 	walletCfg := lnwallet.Config{
-		Database:           remoteDB,
-		Notifier:           cc.chainNotifier,
-		WalletController:   wc,
-		Signer:             cc.signer,
-		FeeEstimator:       cc.feeEstimator,
-		SecretKeyRing:      keyRing,
-		ChainIO:            cc.chainIO,
-		DefaultConstraints: channelConstraints,
-		NetParams:          *cfg.ActiveNetParams.Params,
+		Database:             remoteDB,
+		Notifier:             cc.chainNotifier,
+		WalletController:     wc,
+		Signer:               cc.signer,
+		ChannelContextSigner: cc.channelContextSigner,
+		FeeEstimator:         cc.feeEstimator,
+		SecretKeyRing:        keyRing,
+		ChainIO:              cc.chainIO,
+		DefaultConstraints:   channelConstraints,
+		NetParams:            *cfg.ActiveNetParams.Params,
 	}
 	lnWallet, err := lnwallet.NewLightningWallet(walletCfg)
 	if err != nil {

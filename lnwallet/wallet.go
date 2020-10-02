@@ -1223,28 +1223,13 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	chanState.LocalCommitment.CommitTx = ourCommitTx
 	chanState.RemoteCommitment.CommitTx = theirCommitTx
 
-	// Next, we'll obtain the funding witness script, and the funding
-	// output itself so we can generate a valid signature for the remote
-	// party.
-	fundingIntent := pendingReservation.fundingIntent
-	fundingWitnessScript, fundingOutput, err := fundingIntent.FundingOutput()
-	if err != nil {
-		req.err <- fmt.Errorf("unable to obtain funding output")
-		return
-	}
-
-	// Generate a signature for their version of the initial commitment
-	// transaction.
-	ourKey := ourContribution.MultiSigKey
-	signDesc := input.SignDescriptor{
-		WitnessScript: fundingWitnessScript,
-		KeyDesc:       ourKey,
-		Output:        fundingOutput,
-		HashType:      txscript.SigHashAll,
-		SigHashes:     txscript.NewTxSigHashes(theirCommitTx),
-		InputIndex:    0,
-	}
-	sigTheirCommit, err := l.Cfg.Signer.SignOutputRaw(theirCommitTx, &signDesc)
+	sigTheirCommit, err := l.Cfg.ChannelContextSigner.SignRemoteCommitment(
+		ourContribution,
+		theirContribution,
+		pendingReservation.partialState,
+		pendingReservation.fundingIntent,
+		theirCommitTx,
+	)
 	if err != nil {
 		req.err <- err
 		return

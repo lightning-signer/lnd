@@ -41,6 +41,11 @@ type Config struct {
 	// update the commitment state.
 	Signer input.Signer
 
+	// The wallet's current ChannelContextSigner implementation.
+	// NOTE: This signer will subsume the input.Signer above when
+	// the ChannelContextSigner implementation is complete.
+	ChannelContextSigner ChannelContextSigner
+
 	// FeeEstimator is the implementation that the wallet will use for the
 	// calculation of on-chain transaction fees.
 	FeeEstimator chainfee.Estimator
