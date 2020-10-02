@@ -790,36 +790,22 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.partialState.IdentityPub = nodeID
 
 	var err error
-	reservation.ourContribution.MultiSigKey, err = keyRing.DeriveNextKey(
-		keychain.KeyFamilyMultiSig,
-	)
+	err = l.Cfg.ChannelContextSigner.NewChannel(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
 	}
-	reservation.ourContribution.RevocationBasePoint, err = keyRing.DeriveNextKey(
-		keychain.KeyFamilyRevocationBase,
-	)
+
+	bps, err := l.Cfg.ChannelContextSigner.GetChannelBasepoints(
+		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
 	}
-	reservation.ourContribution.HtlcBasePoint, err = keyRing.DeriveNextKey(
-		keychain.KeyFamilyHtlcBase,
-	)
-	if err != nil {
-		return err
-	}
-	reservation.ourContribution.PaymentBasePoint, err = keyRing.DeriveNextKey(
-		keychain.KeyFamilyPaymentBase,
-	)
-	if err != nil {
-		return err
-	}
-	reservation.ourContribution.DelayBasePoint, err = keyRing.DeriveNextKey(
-		keychain.KeyFamilyDelayBase,
-	)
-	if err != nil {
-		return err
-	}
+	reservation.ourContribution.MultiSigKey = bps.MultiSigKey
+	reservation.ourContribution.RevocationBasePoint = bps.RevocationBasePoint
+	reservation.ourContribution.HtlcBasePoint = bps.HtlcBasePoint
+	reservation.ourContribution.PaymentBasePoint = bps.PaymentBasePoint
+	reservation.ourContribution.DelayBasePoint = bps.DelayBasePoint
 
 	// With the above keys created, we'll also need to initialization our
 	// initial revocation tree state.
@@ -1141,6 +1127,34 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 				},
 			)
 		}
+	}
+
+	// We received accept_channel, update the ChannelContextSigner.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := l.Cfg.ChannelContextSigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType,
+	)
+	if err != nil {
+		req.err <- fmt.Errorf(
+			"ChannelContextSigner.ReadyChannel failed: %v", err)
+		return
 	}
 
 	// Initialize an empty sha-chain for them, tracking the current pending
@@ -1496,6 +1510,36 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	chanState := pendingReservation.partialState
 	chanState.FundingOutpoint = *req.fundingOutpoint
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
+
+	// We received funding_created, update the ChannelContextSigner.
+	// FIXME - This should probably be moved to where open_channel
+	// is handled.
+	pstate := pendingReservation.partialState
+	ours := pendingReservation.ourContribution
+	theirs := pendingReservation.theirContribution
+	err := l.Cfg.ChannelContextSigner.ReadyChannel(
+		pstate.IdentityPub,
+		pendingReservation.pendingChanID,
+		pstate.IsInitiator,
+		uint64(pstate.Capacity),
+		uint64(pendingReservation.pushMSat),
+		&pstate.FundingOutpoint,
+		ours.CsvDelay,
+		pstate.LocalShutdownScript,
+		theirs.RevocationBasePoint.PubKey,
+		theirs.PaymentBasePoint.PubKey,
+		theirs.HtlcBasePoint.PubKey,
+		theirs.DelayBasePoint.PubKey,
+		theirs.MultiSigKey.PubKey,
+		theirs.CsvDelay,
+		pstate.RemoteShutdownScript,
+		pstate.ChanType,
+	)
+	if err != nil {
+		req.err <- fmt.Errorf(
+			"ChannelContextSigner.ReadyChannel failed: %v", err)
+		return
+	}
 
 	// Now that we have the funding outpoint, we can generate both versions
 	// of the commitment transaction, and generate a signature for the

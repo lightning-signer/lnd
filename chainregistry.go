@@ -516,11 +516,8 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		return nil, err
 	}
 
-	internalSigner := internalsigner.NewInternalSigner(wc)
-
 	cc.msgSigner = wc
 	cc.signer = wc
-	cc.channelContextSigner = internalSigner
 	cc.chainIO = wc
 	cc.wc = wc
 
@@ -534,6 +531,9 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		wc.InternalWallet(), cfg.ActiveNetParams.CoinType,
 	)
 	cc.keyRing = keyRing
+
+	internalSigner := internalsigner.NewInternalSigner(wc, keyRing)
+	cc.channelContextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
