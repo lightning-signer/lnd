@@ -23,6 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/remotesigner"
 )
 
 const (
@@ -105,10 +106,26 @@ func New(cfg Config) (*BtcWallet, error) {
 		}
 
 		if !walletExists {
+			// TEMPORARY - In order to facilitate remotesigner
+			// "shadowing" we need to arrange for the remotesigner to
+			// have the same seed as the internal generated wallet.
+			// Sometimes cfg.HdSeed will be nil, in which case we
+			// generate a non-nil seed and return it.  All of this is
+			// removed when we are done shadowing in remotesigner
+			// development.
+			nonNilSeed, err := remotesigner.EstablishShadowSeed(
+				cfg.HdSeed,
+				"btcwallet.New",
+			)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"remotesigner.EstablishShadowSeed failed: %v", err)
+			}
+
 			// Wallet has never been created, perform initial
 			// set up.
 			wallet, err = loader.CreateNewWallet(
-				pubPass, cfg.PrivatePass, cfg.HdSeed,
+				pubPass, cfg.PrivatePass, nonNilSeed,
 				cfg.Birthday,
 			)
 			if err != nil {

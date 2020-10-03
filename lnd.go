@@ -39,6 +39,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/remotesigner"
 	"github.com/lightningnetwork/lnd/macaroons"
 	"github.com/lightningnetwork/lnd/signal"
 	"github.com/lightningnetwork/lnd/tor"
@@ -1149,11 +1150,27 @@ func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 			recoveryWindow,
 		)
 
+		// TEMPORARY - In order to facilitate remotesigner "shadowing"
+		// we need to arrange for the remotesigner to have the same
+		// seed as the internal generated wallet.  Sometimes
+		// cipherSeed.Entropy[:] will be nil, in which case we
+		// generate a non-nil seed and return it.  All of this is
+		// removed when we are done shadowing in remotesigner
+		// development.
+		nonNilSeed, err := remotesigner.EstablishShadowSeed(
+			cipherSeed.Entropy[:],
+			"WalletUnlockParams",
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"remotesigner.EstablishShadowSeed failed: %v", err)
+		}
+
 		// With the seed, we can now use the wallet loader to create
 		// the wallet, then pass it back to avoid unlocking it again.
 		birthday := cipherSeed.BirthdayTime()
 		newWallet, err := loader.CreateNewWallet(
-			password, password, cipherSeed.Entropy[:], birthday,
+			password, password, nonNilSeed, birthday,
 		)
 		if err != nil {
 			// Don't leave the file open in case the new wallet

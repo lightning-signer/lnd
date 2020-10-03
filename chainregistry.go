@@ -29,6 +29,8 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/contextsigner/internalsigner"
+	"github.com/lightningnetwork/lnd/contextsigner/remotesigner"
+	"github.com/lightningnetwork/lnd/contextsigner/shadowsigner"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -528,14 +530,40 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	)
 	cc.keyRing = keyRing
 
-	internalSigner := internalsigner.NewInternalSigner(
+	// TEMPORARY - The ShadowSigner is used to validate the
+	// remotesigner during development.  The ShadowSigner is a
+	// ChannelContextSigner which contains an internal
+	// ChannelContextSigner and a remote ChannelContextSigner. It
+	// delegates all calls to both of the other signers and compares
+	// the results.  In production, only one of the InternalSigner or
+	// a RemoteSigner will be instantiated and it will be used
+	// directly.
+	internalSigner, err := internalsigner.NewInternalSigner(
 		keyRing,
 		wc,
 		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {
 			return wc.SignMessage(pubKey, msg)
 		},
 	)
-	cc.signer = internalSigner
+	if err != nil {
+		fmt.Printf("unable to create internal signer: %v\n", err)
+		return nil, err
+	}
+	var network string
+	switch cfg.ActiveNetParams.CoinType {
+	case keychain.CoinTypeTestnet:
+		network = "testnet"
+	case keychain.CoinTypeBitcoin:
+		network = "mainnet"
+	}
+	remoteSigner, err := remotesigner.NewRemoteSigner(
+		network, "localhost:50051")
+	if err != nil {
+		fmt.Printf("unable to initialize remotesigner: %v\n", err)
+		return nil, err
+	}
+	shadowSigner := shadowsigner.NewShadowSigner(internalSigner, remoteSigner)
+	cc.signer = shadowSigner
 
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
