@@ -85,8 +85,8 @@ func (is *internalSigner) ReadyChannel(
 	remoteShutdownScript []byte,
 	chanType channeldb.ChannelType,
 ) error {
-	// The internal signer doesn't need this call, other
-	// ChannelContextSigner implementations do.
+	// The internal signer doesn't need this call, but validating
+	// signers using the ChannelContextSigner interface will.
 	return nil
 }
 
@@ -105,8 +105,8 @@ func (is *internalSigner) SignRemoteCommitment(
 		return nil, fmt.Errorf("unable to obtain funding output")
 	}
 
-	// Generate a signature for their version of the initial commitment
-	// transaction.
+	// Generate our signature for their version of the initial commitment
+	// transaction to hand back to the counterparty.
 	ourKey := ourContribution.MultiSigKey
 	signDesc := input.SignDescriptor{
 		WitnessScript: fundingWitnessScript,

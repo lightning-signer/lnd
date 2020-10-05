@@ -39,6 +39,7 @@ type Config struct {
 	// used to generate signature for all inputs to potential funding
 	// transactions, as well as for spends from the funding transaction to
 	// update the commitment state.
+	// TODO: Remove this when the ChannelContextSigner is complete.
 	Signer input.Signer
 
 	// The wallet's current ChannelContextSigner implementation.

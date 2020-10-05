@@ -1122,7 +1122,8 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		}
 	}
 
-	// We received accept_channel, update the ChannelContextSigner.
+	// We received accept_channel, update the ChannelContextSigner
+	// with information needed to validate signature requests.
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
@@ -1505,8 +1506,6 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
 
 	// We received funding_created, update the ChannelContextSigner.
-	// FIXME - This should probably be moved to where open_channel
-	// is handled.
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
