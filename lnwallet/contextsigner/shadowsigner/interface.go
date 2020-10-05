@@ -1,7 +1,9 @@
 package shadowsigner
 
 import (
+	"encoding/hex"
 	"fmt"
+	"reflect"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
@@ -45,7 +47,9 @@ func (ss *shadowSigner) NewChannel(
 	if err != nil {
 		return nil, err
 	}
-	if bps0 != bps1 {
+	if !reflect.DeepEqual(bps0, bps1) {
+		logBasepoints("INT", bps0)
+		logBasepoints("RMT", bps1)
 		return nil, fmt.Errorf("ShadowSigner.NewChannel mismatch: "+
 			"internal=%v remote=%v", bps0, bps1)
 	}
@@ -149,6 +153,25 @@ func (ss *shadowSigner) SignRemoteCommitment(
 			"internal=%v remote=%v", sig0, sig1)
 	}
 	return sig1, nil
+}
+
+func logBasepoints(pfx string, bps *lnwallet.ChannelBasepoints) {
+	log.Debugf("%s:         MultiSigKey=%v %s",
+		pfx, bps.MultiSigKey,
+		hex.EncodeToString(bps.MultiSigKey.PubKey.SerializeCompressed()))
+	log.Debugf("%s: RevocationBasePoint=%v %s",
+		pfx, bps.RevocationBasePoint,
+		hex.EncodeToString(
+			bps.RevocationBasePoint.PubKey.SerializeCompressed()))
+	log.Debugf("%s:       HtlcBasePoint=%v %s",
+		pfx, bps.HtlcBasePoint,
+		hex.EncodeToString(bps.HtlcBasePoint.PubKey.SerializeCompressed()))
+	log.Debugf("%s:    PaymentBasePoint=%v %s",
+		pfx, bps.PaymentBasePoint,
+		hex.EncodeToString(bps.PaymentBasePoint.PubKey.SerializeCompressed()))
+	log.Debugf("%s:      DelayBasePoint=%v %s",
+		pfx, bps.DelayBasePoint,
+		hex.EncodeToString(bps.DelayBasePoint.PubKey.SerializeCompressed()))
 }
 
 // Compile time check to make sure shadowSigner implements the
