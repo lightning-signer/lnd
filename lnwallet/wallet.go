@@ -789,14 +789,7 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.nodeAddr = nodeAddr
 	reservation.partialState.IdentityPub = nodeID
 
-	var err error
-	err = l.Cfg.ChannelContextSigner.NewChannel(
-		reservation.partialState.IdentityPub, reservation.pendingChanID)
-	if err != nil {
-		return err
-	}
-
-	bps, err := l.Cfg.ChannelContextSigner.GetChannelBasepoints(
+	bps, err := l.Cfg.ChannelContextSigner.NewChannel(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err

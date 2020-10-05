@@ -31,15 +31,6 @@ func NewInternalSigner(
 func (is *internalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) error {
-	// The internal signer doesn't need this call, other
-	// ChannelContextSigner implementations do.
-	return nil
-}
-
-func (is *internalSigner) GetChannelBasepoints(
-	peerNode *btcec.PublicKey,
-	pendingChanID [32]byte,
 ) (*lnwallet.ChannelBasepoints, error) {
 	var err error
 	var bps lnwallet.ChannelBasepoints

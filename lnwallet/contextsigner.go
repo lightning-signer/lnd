@@ -21,11 +21,6 @@ type ChannelContextSigner interface {
 	NewChannel(
 		peerNode *btcec.PublicKey,
 		pendingChanID [32]byte,
-	) error
-
-	GetChannelBasepoints(
-		peerNode *btcec.PublicKey,
-		pendingChanID [32]byte,
 	) (*ChannelBasepoints, error)
 
 	ReadyChannel(
