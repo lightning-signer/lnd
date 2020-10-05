@@ -35,34 +35,18 @@ func NewShadowSigner(
 func (ss *shadowSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) error {
-	var err error
-	err = ss.internalSigner.NewChannel(peerNode, pendingChanID)
-	if err != nil {
-		return err
-	}
-	err = ss.remoteSigner.NewChannel(peerNode, pendingChanID)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ss *shadowSigner) GetChannelBasepoints(
-	peerNode *btcec.PublicKey,
-	pendingChanID [32]byte,
 ) (*lnwallet.ChannelBasepoints, error) {
 	var err error
-	bps0, err := ss.internalSigner.GetChannelBasepoints(peerNode, pendingChanID)
+	bps0, err := ss.internalSigner.NewChannel(peerNode, pendingChanID)
 	if err != nil {
 		return nil, err
 	}
-	bps1, err := ss.remoteSigner.GetChannelBasepoints(peerNode, pendingChanID)
+	bps1, err := ss.remoteSigner.NewChannel(peerNode, pendingChanID)
 	if err != nil {
 		return nil, err
 	}
 	if bps0 != bps1 {
-		return nil, fmt.Errorf("ShadowSigner.GetChannelBasepoints mismatch: "+
+		return nil, fmt.Errorf("ShadowSigner.NewChannel mismatch: "+
 			"internal=%v remote=%v", bps0, bps1)
 	}
 	return bps1, nil

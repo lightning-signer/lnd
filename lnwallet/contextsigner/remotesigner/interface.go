@@ -111,7 +111,7 @@ func NewRemoteSigner(
 func (rsi *remoteSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) error {
+) (*lnwallet.ChannelBasepoints, error) {
 	log.Debugf("NewChannel request: nodeID=%s, peerNodeID=%s, pendingChanID=%s",
 		hex.EncodeToString(rsi.nodeID[:]),
 		hex.EncodeToString(peerNode.SerializeCompressed()),
@@ -128,26 +128,8 @@ func (rsi *remoteSigner) NewChannel(
 			ChannelNonce0: &ChannelNonce{Data: channelNonceInitial},
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	return nil
-}
-
-func (rsi *remoteSigner) GetChannelBasepoints(
-	peerNode *btcec.PublicKey,
-	pendingChanID [32]byte,
-) (*lnwallet.ChannelBasepoints, error) {
-	log.Debugf("GetChannelBasepoints request: "+
-		"nodeID=%s, peerNodeID=%s, pendingChanID=%s",
-		hex.EncodeToString(rsi.nodeID[:]),
-		hex.EncodeToString(peerNode.SerializeCompressed()),
-		hex.EncodeToString(pendingChanID[:]))
-
-	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 
 	rsp, err := rsi.client.GetChannelBasepoints(ctx,
 		&GetChannelBasepointsRequest{
