@@ -18,11 +18,14 @@ type ChannelBasepoints struct {
 }
 
 type ChannelContextSigner interface {
+	// Inform the validating signer that a new channel is being created.
 	NewChannel(
 		peerNode *btcec.PublicKey,
 		pendingChanID [32]byte,
 	) (*ChannelBasepoints, error)
 
+	// Provide the signer with needed information to validate
+	// subsequent signature requests.
 	ReadyChannel(
 		peerNode *btcec.PublicKey,
 		pendingChanID [32]byte,
@@ -42,6 +45,7 @@ type ChannelContextSigner interface {
 		chanType channeldb.ChannelType,
 	) error
 
+	// Generate our signature for the peer's commitment transaction.
 	SignRemoteCommitment(
 		ourContribution *ChannelContribution,
 		theirContribution *ChannelContribution,
