@@ -18,6 +18,9 @@ type ChannelBasepoints struct {
 }
 
 type ChannelContextSigner interface {
+	// Set our NodeID in the validating signer.
+	SetNodeID(pubkey *btcec.PublicKey) error
+
 	// Inform the validating signer that a new channel is being created.
 	NewChannel(
 		peerNode *btcec.PublicKey,

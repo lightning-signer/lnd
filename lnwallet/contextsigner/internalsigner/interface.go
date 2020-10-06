@@ -28,6 +28,13 @@ func NewInternalSigner(
 	}
 }
 
+func (is *internalSigner) SetNodeID(pubkey *btcec.PublicKey) error {
+	// The internal signer doesn't need this call, but other
+	// validating signers (connecting to a remote server, for example)
+	// will.
+	return nil
+}
+
 func (is *internalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
