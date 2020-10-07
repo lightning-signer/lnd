@@ -1,12 +1,14 @@
 package shadowsigner
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"reflect"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -24,6 +26,38 @@ type shadowSigner struct {
 	remoteSigner   lnwallet.ChannelContextSigner
 }
 
+// We need to capture the same seed that the internal wallet uses for
+// the remote signer.  These routines are removed once we are done
+// with the shadowing phase of remotesigner development.
+var (
+	shadowSeed []byte
+)
+
+// The argument to EstablishShadowSeed is sometimes empty, in which
+// case we will generate the seed here and return the generated seed.
+func EstablishShadowSeed(seed []byte, debugCaller string) ([]byte, error) {
+	// If no entropy was supplied make some up.
+	if seed != nil {
+		shadowSeed = seed
+		log.Infof("EstablishShadowSeed: seed %s was supplied for %s",
+			hex.EncodeToString(shadowSeed), debugCaller)
+	} else {
+		var err error
+		shadowSeed, err = hdkeychain.GenerateSeed(
+			hdkeychain.RecommendedSeedLen)
+		if err != nil {
+			return nil, err
+		}
+		log.Infof("EstablishShadowSeed: generated seed %s for %s",
+			hex.EncodeToString(shadowSeed), debugCaller)
+	}
+	return shadowSeed, nil
+}
+
+func GetShadowSeed() []byte {
+	return shadowSeed
+}
+
 func NewShadowSigner(
 	internalSigner lnwallet.ChannelContextSigner,
 	remoteSigner lnwallet.ChannelContextSigner,
@@ -32,6 +66,16 @@ func NewShadowSigner(
 		internalSigner: internalSigner,
 		remoteSigner:   remoteSigner,
 	}
+}
+
+func (ss *shadowSigner) SetNodeID(pubkey *btcec.PublicKey) error {
+	if err := ss.internalSigner.SetNodeID(pubkey); err != nil {
+		return err
+	}
+	if err := ss.remoteSigner.SetNodeID(pubkey); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ss *shadowSigner) NewChannel(
@@ -47,11 +91,29 @@ func (ss *shadowSigner) NewChannel(
 	if err != nil {
 		return nil, err
 	}
-	if !reflect.DeepEqual(bps0, bps1) {
+	// FIXME - the remotesigner gets the index wrong after a restart
+	// with an existing wallet (it's index starts over).  For now we
+	// only compare the pubkeys ...
+	if !bytes.Equal(
+		bps0.MultiSigKey.PubKey.SerializeCompressed(),
+		bps1.MultiSigKey.PubKey.SerializeCompressed()) ||
+		!bytes.Equal(
+			bps0.RevocationBasePoint.PubKey.SerializeCompressed(),
+			bps1.RevocationBasePoint.PubKey.SerializeCompressed()) ||
+		!bytes.Equal(
+			bps0.HtlcBasePoint.PubKey.SerializeCompressed(),
+			bps1.HtlcBasePoint.PubKey.SerializeCompressed()) ||
+		!bytes.Equal(
+			bps0.PaymentBasePoint.PubKey.SerializeCompressed(),
+			bps1.PaymentBasePoint.PubKey.SerializeCompressed()) ||
+		!bytes.Equal(
+			bps0.DelayBasePoint.PubKey.SerializeCompressed(),
+			bps1.DelayBasePoint.PubKey.SerializeCompressed()) {
 		logBasepoints("INT", bps0)
 		logBasepoints("RMT", bps1)
-		return nil, fmt.Errorf("ShadowSigner.NewChannel mismatch: "+
-			"internal=%v remote=%v", bps0, bps1)
+		return nil, fmt.Errorf(
+			"ShadowSigner.NewChannel mismatch: "+
+				"internal=%v remote=%v", bps0, bps1)
 	}
 	return bps1, nil
 }
@@ -148,7 +210,7 @@ func (ss *shadowSigner) SignRemoteCommitment(
 	if err != nil {
 		return nil, err
 	}
-	if sig0 != sig1 {
+	if !reflect.DeepEqual(sig0, sig1) {
 		return nil, fmt.Errorf("ShadowSigner.SignRemoteCommitment mismatch: "+
 			"internal=%v remote=%v", sig0, sig1)
 	}

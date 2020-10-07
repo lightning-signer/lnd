@@ -10,7 +10,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -19,96 +18,95 @@ import (
 	"google.golang.org/grpc"
 )
 
-type remoteSigner struct {
+type RemoteSigner struct {
+	networkName    string
 	serverAddr     string
 	conn           *grpc.ClientConn
 	client         SignerClient
-	nodeID         [33]byte
+	nodeID         []byte
 	basePointIndex uint32
-}
-
-// TEMPORARY - in order to facilitate shadowing, we need to capture
-// the same seed that the internal wallet uses for the remote signer.
-// These routines are removed once we are done with the shadowing
-// phase of remotesigner development.
-var (
-	shadowSeed []byte
-)
-
-// The argument to SetShadowSeed is sometimes empty, in which case
-// we will generate the seed here and return the generated seed.
-func EstablishShadowSeed(seed []byte, debugCaller string) ([]byte, error) {
-	// If no entropy was supplied make some up.
-	if seed != nil {
-		shadowSeed = seed
-		log.Infof("EstablishShadowSeed: seed %s was supplied for %s",
-			hex.EncodeToString(shadowSeed), debugCaller)
-	} else {
-		var err error
-		shadowSeed, err = hdkeychain.GenerateSeed(
-			hdkeychain.RecommendedSeedLen)
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("EstablishShadowSeed: generated seed %s for %s",
-			hex.EncodeToString(shadowSeed), debugCaller)
-	}
-	return shadowSeed, nil
 }
 
 func NewRemoteSigner(
 	networkName string,
 	serverAddr string,
-) (lnwallet.ChannelContextSigner, error) {
+) (*RemoteSigner, error) {
 	log.Infof("NewRemoteSigner: networkName=%s serverAddr=%s",
 		networkName, serverAddr)
-
-	if shadowSeed == nil {
-		return nil, fmt.Errorf("NewRemoteSigner called with shadowSeed unset")
-	}
 
 	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
 
-	client := NewSignerClient(conn)
+	return &RemoteSigner{
+		networkName:    networkName,
+		serverAddr:     serverAddr,
+		conn:           conn,
+		client:         NewSignerClient(conn),
+		basePointIndex: 0,
+	}, nil
+}
+
+// This routine should only be called when a node is created for the
+// fist time.
+func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
+	var err error
+
+	log.Infof("InitNode: shadowSeed=%s", hex.EncodeToString(shadowSeed))
+	if shadowSeed == nil {
+		panic("InitNode called with shadowSeed unset")
+		return fmt.Errorf("InitNode called with shadowSeed unset")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rsp, err := client.Init(ctx, &InitRequest{
+	rsp, err := rsi.client.Init(ctx, &InitRequest{
 		NodeConfig: &NodeConfig{
 			KeyDerivationStyle: NodeConfig_LND,
 		},
-		Chainparams: &ChainParams{NetworkName: networkName},
+		Chainparams: &ChainParams{NetworkName: rsi.networkName},
 		Coldstart:   true,
 		HsmSecret:   &BIP32Seed{Data: shadowSeed},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(rsp.NodeId.Data) != 33 {
-		return nil, fmt.Errorf("nodeid from remotesigner wrong size: %v",
+		return fmt.Errorf("nodeid from remotesigner wrong size: %v",
 			len(rsp.NodeId.Data))
 	}
-
-	rsi := &remoteSigner{
-		serverAddr:     serverAddr,
-		conn:           conn,
-		client:         client,
-		basePointIndex: 0,
-	}
-	copy(rsi.nodeID[:], rsp.NodeId.Data)
+	rsi.nodeID = rsp.NodeId.Data
 
 	log.Infof("InitNode: returned nodeID: %s",
-		hex.EncodeToString(rsi.nodeID[:]))
+		hex.EncodeToString(rsi.nodeID))
 
-	return rsi, nil
+	return nil
 }
 
-func (rsi *remoteSigner) NewChannel(
+func (rsi *RemoteSigner) SetNodeID(pubkey *btcec.PublicKey) error {
+	nodeid := pubkey.SerializeCompressed()
+	if rsi.nodeID != nil {
+		// This node was just created, the rsi.nodeID is already set.
+		// Make sure it matches.
+		if !bytes.Equal(nodeid, rsi.nodeID) {
+			return fmt.Errorf("SetNodeID: nodeid mismatch: rsi=%s set=%s",
+				hex.EncodeToString(rsi.nodeID),
+				hex.EncodeToString(nodeid))
+		}
+	} else {
+		// We are opening an existing wallet and the remotesigner
+		// already has the node but we need the nodeid to connect to
+		// it.
+		log.Infof("SetNodeID: %s", hex.EncodeToString(nodeid))
+		rsi.nodeID = nodeid
+	}
+	return nil
+}
+
+func (rsi *RemoteSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
 ) (*lnwallet.ChannelBasepoints, error) {
@@ -130,6 +128,9 @@ func (rsi *remoteSigner) NewChannel(
 	if err != nil {
 		return nil, err
 	}
+
+	// ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	// defer cancel()
 
 	rsp, err := rsi.client.GetChannelBasepoints(ctx,
 		&GetChannelBasepointsRequest{
@@ -226,7 +227,7 @@ func (rsi *remoteSigner) NewChannel(
 	return bps, nil
 }
 
-func (rsi *remoteSigner) ReadyChannel(
+func (rsi *RemoteSigner) ReadyChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
 	isOutbound bool,
@@ -330,7 +331,7 @@ func (rsi *remoteSigner) ReadyChannel(
 	return nil
 }
 
-func (rsi *remoteSigner) SignRemoteCommitment(
+func (rsi *RemoteSigner) SignRemoteCommitment(
 	ourContribution *lnwallet.ChannelContribution,
 	theirContribution *lnwallet.ChannelContribution,
 	partialState *channeldb.OpenChannel,
@@ -511,6 +512,6 @@ func generateRemoteCommitmentWitnessScripts(
 	return witscripts, nil
 }
 
-// A compile time check to ensure that remoteSigner implements the
+// A compile time check to ensure that RemoteSigner implements the
 // requisite interfaces.
-var _ lnwallet.ChannelContextSigner = (*remoteSigner)(nil)
+var _ lnwallet.ChannelContextSigner = (*RemoteSigner)(nil)

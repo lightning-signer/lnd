@@ -23,7 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
-	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/remotesigner"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/shadowsigner"
 )
 
 const (
@@ -113,7 +113,7 @@ func New(cfg Config) (*BtcWallet, error) {
 			// generate a non-nil seed and return it.  All of this is
 			// removed when we are done shadowing in remotesigner
 			// development.
-			nonNilSeed, err := remotesigner.EstablishShadowSeed(
+			nonNilSeed, err := shadowsigner.EstablishShadowSeed(
 				cfg.HdSeed,
 				"btcwallet.New",
 			)

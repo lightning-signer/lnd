@@ -39,7 +39,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
-	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/remotesigner"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/shadowsigner"
 	"github.com/lightningnetwork/lnd/macaroons"
 	"github.com/lightningnetwork/lnd/signal"
 	"github.com/lightningnetwork/lnd/tor"
@@ -1157,7 +1157,7 @@ func waitForWalletPassword(cfg *Config, restEndpoints []net.Addr,
 		// generate a non-nil seed and return it.  All of this is
 		// removed when we are done shadowing in remotesigner
 		// development.
-		nonNilSeed, err := remotesigner.EstablishShadowSeed(
+		nonNilSeed, err := shadowsigner.EstablishShadowSeed(
 			cipherSeed.Entropy[:],
 			"WalletUnlockParams",
 		)
