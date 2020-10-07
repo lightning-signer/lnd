@@ -36,19 +36,21 @@ var (
 // The argument to EstablishShadowSeed is sometimes empty, in which
 // case we will generate the seed here and return the generated seed.
 func EstablishShadowSeed(seed []byte, debugCaller string) ([]byte, error) {
-	// If no entropy was supplied make some up.
+	// Was entropy supplied?
 	if seed != nil {
+		// Yes, use the supplied entropy..
 		shadowSeed = seed
-		log.Infof("EstablishShadowSeed: seed %s was supplied for %s",
+		log.Infof("EstablishShadowSeed: using supplied seed %s, called from %s",
 			hex.EncodeToString(shadowSeed), debugCaller)
 	} else {
+		// No, generate some entropy and return it.
 		var err error
 		shadowSeed, err = hdkeychain.GenerateSeed(
 			hdkeychain.RecommendedSeedLen)
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("EstablishShadowSeed: generated seed %s for %s",
+		log.Infof("EstablishShadowSeed: generated seed %s, called from %s",
 			hex.EncodeToString(shadowSeed), debugCaller)
 	}
 	return shadowSeed, nil

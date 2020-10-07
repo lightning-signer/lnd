@@ -13722,6 +13722,10 @@ func testHoldInvoicePersistence(net *lntest.NetworkHarness, t *harnessTest) {
 // channel funding workflow given a channel point that was constructed outside
 // the main daemon.
 func testExternalFundingChanPoint(net *lntest.NetworkHarness, t *harnessTest) {
+	if net.UsingRemoteSigner {
+		t.Skipf("skipping external funding test for remotesigner")
+	}
+
 	ctxb := context.Background()
 
 	// First, we'll create two new nodes that we'll use to open channel
