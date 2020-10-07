@@ -349,10 +349,6 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		nodeKeyECDH = cc.signer
 	)
 
-	// Some validating signers need to know the nodeid (when
-	// connecting to a remote server, for example).
-	cc.channelContextSigner.SetNodeID(nodeKeyECDH.PubKey())
-
 	listeners := make([]net.Listener, len(listenAddrs))
 	for i, listenAddr := range listenAddrs {
 		// Note: though brontide.NewListener uses ResolveTCPAddr, it

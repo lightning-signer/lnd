@@ -48,8 +48,8 @@ func NewRemoteSigner(
 	}, nil
 }
 
-// This routine should only be called when a node is created for the
-// fist time.
+// InitNode should only be called when a node (wallet) is created for
+// the fist time.
 func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
 	var err error
 
@@ -79,31 +79,15 @@ func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
 			len(rsp.NodeId.Data))
 	}
 	rsi.nodeID = rsp.NodeId.Data
-
-	log.Infof("InitNode: returned nodeID: %s",
-		hex.EncodeToString(rsi.nodeID))
+	log.Infof("InitNode: nodeID: %s", hex.EncodeToString(rsi.nodeID))
 
 	return nil
 }
 
-func (rsi *RemoteSigner) SetNodeID(pubkey *btcec.PublicKey) error {
-	nodeid := pubkey.SerializeCompressed()
-	if rsi.nodeID != nil {
-		// This node was just created, the rsi.nodeID is already set.
-		// Make sure it matches.
-		if !bytes.Equal(nodeid, rsi.nodeID) {
-			return fmt.Errorf("SetNodeID: nodeid mismatch: rsi=%s set=%s",
-				hex.EncodeToString(rsi.nodeID),
-				hex.EncodeToString(nodeid))
-		}
-	} else {
-		// We are opening an existing wallet and the remotesigner
-		// already has the node but we need the nodeid to connect to
-		// it.
-		log.Infof("SetNodeID: %s", hex.EncodeToString(nodeid))
-		rsi.nodeID = nodeid
-	}
-	return nil
+// SetNodeID is called when an existing wallet is reopened.
+func (rsi *RemoteSigner) SetNodeID(pubkey *btcec.PublicKey) {
+	rsi.nodeID = pubkey.SerializeCompressed()
+	log.Infof("SetNodeID: %s", hex.EncodeToString(rsi.nodeID))
 }
 
 func (rsi *RemoteSigner) NewChannel(
@@ -114,6 +98,10 @@ func (rsi *RemoteSigner) NewChannel(
 		hex.EncodeToString(rsi.nodeID[:]),
 		hex.EncodeToString(peerNode.SerializeCompressed()),
 		hex.EncodeToString(pendingChanID[:]))
+
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
 
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 
@@ -274,6 +262,10 @@ func (rsi *RemoteSigner) ReadyChannel(
 		hex.EncodeToString(remoteShutdownScript),
 		chanType)
 
+	if rsi.nodeID == nil {
+		return fmt.Errorf("remotesigner nodeID not set")
+	}
+
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 	channelNoncePermanent := channelNoncePermanent(fundingOutpoint)
 
@@ -353,6 +345,10 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 		hex.EncodeToString(remotePerCommitPoint.SerializeCompressed()),
 		theirCommitTx,
 	)
+
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
 
 	witscripts, err := generateRemoteCommitmentWitnessScripts(
 		remotePerCommitPoint,

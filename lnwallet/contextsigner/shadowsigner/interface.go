@@ -68,16 +68,6 @@ func NewShadowSigner(
 	}
 }
 
-func (ss *shadowSigner) SetNodeID(pubkey *btcec.PublicKey) error {
-	if err := ss.internalSigner.SetNodeID(pubkey); err != nil {
-		return err
-	}
-	if err := ss.remoteSigner.SetNodeID(pubkey); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (ss *shadowSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
@@ -115,7 +105,10 @@ func (ss *shadowSigner) NewChannel(
 			"ShadowSigner.NewChannel mismatch: "+
 				"internal=%v remote=%v", bps0, bps1)
 	}
-	return bps1, nil
+
+	// Return the internally generated KeyDescriptors while shadowing
+	// since they have the correct Index values.
+	return bps0, nil
 }
 
 func (ss *shadowSigner) ReadyChannel(

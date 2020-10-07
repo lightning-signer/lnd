@@ -599,14 +599,28 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 
 	cc.wallet = lnWallet
 
-	// If we've seen a new seed the wallet has been freshly created
-	// and we need to initialize the remoteserver's node object.
+	// Did we create a new wallet?  The shadowSeed will be set if
+	// the wallet is new .....
 	shadowSeed := shadowsigner.GetShadowSeed()
 	if shadowSeed != nil {
+		// This is a new wallet, initialize the node in the
+		// remotesigner.
 		if err = remoteSigner.InitNode(shadowSeed); err != nil {
 			fmt.Printf("remoteSigner.Init failed: %v\n", err)
 			return nil, err
 		}
+	} else {
+		// This is an existing wallet, set the NodeID in the
+		// remotesigner interface.
+		idKeyDesc, err := keyRing.DeriveKey(keychain.KeyLocator{
+			Family: keychain.KeyFamilyNodeKey,
+			Index:  0,
+		})
+		if err != nil {
+			fmt.Printf("trouble deriving idKeyDesc: %v\n", err)
+			return nil, err
+		}
+		remoteSigner.SetNodeID(idKeyDesc.PubKey)
 	}
 
 	return cc, nil
