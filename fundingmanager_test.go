@@ -36,6 +36,7 @@ import (
 	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/internalsigner"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -263,15 +264,16 @@ func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 	estimator chainfee.Estimator) (*lnwallet.LightningWallet, error) {
 
 	wallet, err := lnwallet.NewLightningWallet(lnwallet.Config{
-		Database:           cdb,
-		Notifier:           notifier,
-		SecretKeyRing:      keyRing,
-		WalletController:   wc,
-		Signer:             signer,
-		ChainIO:            bio,
-		FeeEstimator:       estimator,
-		NetParams:          *netParams,
-		DefaultConstraints: defaultBtcChannelConstraints,
+		Database:             cdb,
+		Notifier:             notifier,
+		SecretKeyRing:        keyRing,
+		WalletController:     wc,
+		Signer:               signer,
+		ChannelContextSigner: internalsigner.NewInternalSigner(signer, keyRing),
+		ChainIO:              bio,
+		FeeEstimator:         estimator,
+		NetParams:            *netParams,
+		DefaultConstraints:   defaultBtcChannelConstraints,
 	})
 	if err != nil {
 		return nil, err

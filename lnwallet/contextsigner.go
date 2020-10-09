@@ -18,6 +18,9 @@ type ChannelBasepoints struct {
 }
 
 type ChannelContextSigner interface {
+	// Update signer with shim for external funding flow.
+	ShimKeyRing(keyRing keychain.KeyRing) error
+
 	// Inform the validating signer that a new channel is being created.
 	NewChannel(
 		peerNode *btcec.PublicKey,

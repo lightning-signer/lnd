@@ -707,6 +707,13 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 			KeyRing:    keyRing,
 			ShimIntent: shimIntent,
 		}
+		err = l.Cfg.ChannelContextSigner.ShimKeyRing(keyRing)
+		if err != nil {
+			fundingIntent.Cancel()
+			req.err <- err
+			req.resp <- nil
+			return
+		}
 
 		// As this was a registered shim intent, we'll obtain the thaw
 		// height of the intent, if present at all. If this is

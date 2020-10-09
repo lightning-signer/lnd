@@ -532,7 +532,7 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	)
 	cc.keyRing = keyRing
 
-	internalSigner := internalsigner.NewInternalSigner(wc, keyRing)
+	internalSigner := internalsigner.NewInternalSigner(cc.signer, keyRing)
 	cc.channelContextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment

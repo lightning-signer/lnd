@@ -28,6 +28,11 @@ func NewInternalSigner(
 	}
 }
 
+func (is *internalSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+	is.keyRing = keyRing
+	return nil
+}
+
 func (is *internalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,

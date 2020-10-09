@@ -44,6 +44,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
+	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/internalsigner"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/stretchr/testify/require"
 )
@@ -327,13 +328,14 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 	}
 
 	cfg := lnwallet.Config{
-		Database:         cdb,
-		Notifier:         notifier,
-		SecretKeyRing:    keyRing,
-		WalletController: wc,
-		Signer:           signer,
-		ChainIO:          bio,
-		FeeEstimator:     chainfee.NewStaticEstimator(2500, 0),
+		Database:             cdb,
+		Notifier:             notifier,
+		SecretKeyRing:        keyRing,
+		WalletController:     wc,
+		Signer:               signer,
+		ChannelContextSigner: internalsigner.NewInternalSigner(signer, keyRing),
+		ChainIO:              bio,
+		FeeEstimator:         chainfee.NewStaticEstimator(2500, 0),
 		DefaultConstraints: channeldb.ChannelConstraints{
 			DustLimit:        500,
 			MaxPendingAmount: lnwire.NewMSatFromSatoshis(btcutil.SatoshiPerBitcoin) * 100,
