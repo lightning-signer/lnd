@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
+	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 )
@@ -68,6 +69,19 @@ func NewShadowSigner(
 		internalSigner: internalSigner,
 		remoteSigner:   remoteSigner,
 	}
+}
+
+func (ss *shadowSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+	var err error
+	err = ss.internalSigner.ShimKeyRing(keyRing)
+	if err != nil {
+		return nil
+	}
+	err = ss.remoteSigner.ShimKeyRing(keyRing)
+	if err != nil {
+		return nil
+	}
+	return nil
 }
 
 func (ss *shadowSigner) NewChannel(

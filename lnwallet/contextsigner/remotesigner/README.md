@@ -1,4 +1,8 @@
 
+Install the protobuf go plugin:
+
+    go get github.com/golang/protobuf/protoc-gen-go
+
 Generate the stubs:
 
     cd lnd/lnwallet/contextsigner/remotesigner

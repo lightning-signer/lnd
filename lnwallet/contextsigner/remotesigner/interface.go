@@ -48,6 +48,11 @@ func NewRemoteSigner(
 	}, nil
 }
 
+func (rsi *RemoteSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+	// The current remotesigner cannot support external funding.
+	return fmt.Errorf("remotesigner does not support external funding")
+}
+
 // InitNode should only be called when a node (wallet) is created for
 // the fist time.
 func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
