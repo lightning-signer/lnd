@@ -11,20 +11,26 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
+	"github.com/lightningnetwork/lnd/lnwire"
 )
 
 type internalSigner struct {
-	signer  input.Signer
-	keyRing keychain.KeyRing
+	signer      input.Signer
+	keyRing     keychain.KeyRing
+	signMessage func(
+		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error)
 }
 
 func NewInternalSigner(
 	signer input.Signer,
 	keyRing keychain.KeyRing,
+	signMessage func(
+		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error),
 ) lnwallet.ChannelContextSigner {
 	return &internalSigner{
-		signer:  signer,
-		keyRing: keyRing,
+		signer:      signer,
+		keyRing:     keyRing,
+		signMessage: signMessage,
 	}
 }
 
@@ -122,6 +128,14 @@ func (is *internalSigner) SignRemoteCommitment(
 		InputIndex:    0,
 	}
 	return is.signer.SignOutputRaw(theirCommitTx, &signDesc)
+}
+
+func (is *internalSigner) SignChannelAnnouncement(
+	chanID lnwire.ChannelID,
+	localFundingKey *btcec.PublicKey,
+	dataToSign []byte,
+) (input.Signature, error) {
+	return is.signMessage(localFundingKey, dataToSign)
 }
 
 // Compile time check to make sure internalSigner implements the

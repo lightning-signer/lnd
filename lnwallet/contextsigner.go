@@ -7,6 +7,7 @@ import (
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
+	"github.com/lightningnetwork/lnd/lnwire"
 )
 
 type ChannelBasepoints struct {
@@ -15,6 +16,21 @@ type ChannelBasepoints struct {
 	HtlcBasePoint       keychain.KeyDescriptor
 	PaymentBasePoint    keychain.KeyDescriptor
 	DelayBasePoint      keychain.KeyDescriptor
+}
+
+type NodeContextSigner interface {
+	// ECDH performs an ECDH operation between pub and priv. The
+	// returned value is the sha256 of the compressed shared point.
+	ECDH(pubKey *btcec.PublicKey) ([32]byte, error)
+
+	// Generate the node signature for the channel announcement.
+	SignChannelAnnouncement(dataToSign []byte) (input.Signature, error)
+
+	// Generate the node signature for the node announcement.
+	SignNodeAnnouncement(dataToSign []byte) (input.Signature, error)
+
+	// Generate the node signature for the channel update.
+	SignChannelUpdate(dataToSign []byte) (input.Signature, error)
 }
 
 type ChannelContextSigner interface {
@@ -55,5 +71,12 @@ type ChannelContextSigner interface {
 		partialState *channeldb.OpenChannel,
 		fundingIntent chanfunding.Intent,
 		theirCommitTx *wire.MsgTx,
+	) (input.Signature, error)
+
+	// Generate the funding signature for the channel announcement.
+	SignChannelAnnouncement(
+		chanID lnwire.ChannelID,
+		localFundingKey *btcec.PublicKey,
+		dataToSign []byte,
 	) (input.Signature, error)
 }

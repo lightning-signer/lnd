@@ -1004,6 +1004,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 
 			return cc.msgSigner.SignMessage(pubKey, msg)
 		},
+		ChannelContextSigner: cc.channelContextSigner,
 		CurrentNodeAnnouncement: func() (lnwire.NodeAnnouncement, error) {
 			return s.genNodeAnnouncement(true)
 		},

@@ -260,8 +260,9 @@ func (n *testNode) AddNewChannel(channel *channeldb.OpenChannel,
 func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 	notifier chainntnfs.ChainNotifier, wc lnwallet.WalletController,
 	signer input.Signer, keyRing keychain.SecretKeyRing,
-	bio lnwallet.BlockChainIO,
-	estimator chainfee.Estimator) (*lnwallet.LightningWallet, error) {
+	bio lnwallet.BlockChainIO, estimator chainfee.Estimator,
+	internalSigner lnwallet.ChannelContextSigner,
+) (*lnwallet.LightningWallet, error) {
 
 	wallet, err := lnwallet.NewLightningWallet(lnwallet.Config{
 		Database:             cdb,
@@ -269,7 +270,7 @@ func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 		SecretKeyRing:        keyRing,
 		WalletController:     wc,
 		Signer:               signer,
-		ChannelContextSigner: internalsigner.NewInternalSigner(signer, keyRing),
+		ChannelContextSigner: internalSigner,
 		ChainIO:              bio,
 		FeeEstimator:         estimator,
 		NetParams:            *netParams,
@@ -335,9 +336,16 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 		RootKey: alicePrivKey,
 	}
 
+	internalSigner := internalsigner.NewInternalSigner(
+		signer, keyRing, func(pubKey *btcec.PublicKey,
+			msg []byte) (input.Signature, error) {
+			return testSig, nil
+		},
+	)
+
 	lnw, err := createTestWallet(
 		cdb, netParams, chainNotifier, wc, signer, keyRing, bio,
-		estimator,
+		estimator, internalSigner,
 	)
 	if err != nil {
 		t.Fatalf("unable to create test ln wallet: %v", err)
@@ -357,6 +365,7 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 
 			return testSig, nil
 		},
+		ChannelContextSigner: internalSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 
@@ -502,6 +511,7 @@ func recreateAliceFundingManager(t *testing.T, alice *testNode) {
 			msg []byte) (input.Signature, error) {
 			return testSig, nil
 		},
+		ChannelContextSigner: oldCfg.ChannelContextSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 

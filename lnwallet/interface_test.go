@@ -328,14 +328,15 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 	}
 
 	cfg := lnwallet.Config{
-		Database:             cdb,
-		Notifier:             notifier,
-		SecretKeyRing:        keyRing,
-		WalletController:     wc,
-		Signer:               signer,
-		ChannelContextSigner: internalsigner.NewInternalSigner(signer, keyRing),
-		ChainIO:              bio,
-		FeeEstimator:         chainfee.NewStaticEstimator(2500, 0),
+		Database:         cdb,
+		Notifier:         notifier,
+		SecretKeyRing:    keyRing,
+		WalletController: wc,
+		Signer:           signer,
+		ChannelContextSigner: internalsigner.NewInternalSigner(
+			signer, keyRing, nil),
+		ChainIO:      bio,
+		FeeEstimator: chainfee.NewStaticEstimator(2500, 0),
 		DefaultConstraints: channeldb.ChannelConstraints{
 			DustLimit:        500,
 			MaxPendingAmount: lnwire.NewMSatFromSatoshis(btcutil.SatoshiPerBitcoin) * 100,

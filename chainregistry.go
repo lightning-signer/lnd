@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
@@ -532,7 +533,13 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	)
 	cc.keyRing = keyRing
 
-	internalSigner := internalsigner.NewInternalSigner(cc.signer, keyRing)
+	internalSigner := internalsigner.NewInternalSigner(
+		cc.signer,
+		keyRing,
+		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {
+			return cc.msgSigner.SignMessage(pubKey, msg)
+		},
+	)
 	cc.channelContextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment

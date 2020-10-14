@@ -233,6 +233,11 @@ type fundingConfig struct {
 	SignMessage func(pubKey *btcec.PublicKey,
 		msg []byte) (input.Signature, error)
 
+	// The ChannelContextSigner implementation.
+	// NOTE: This signer will subsume the SignMessage above when
+	// the ChannelContextSigner implementation is complete.
+	ChannelContextSigner lnwallet.ChannelContextSigner
+
 	// CurrentNodeAnnouncement should return the latest, fully signed node
 	// announcement from the backing Lightning Network node.
 	CurrentNodeAnnouncement func() (lnwire.NodeAnnouncement, error)
@@ -2879,7 +2884,8 @@ func (f *fundingManager) newChanAnnouncement(localPubKey, remotePubKey,
 		return nil, errors.Errorf("unable to generate node "+
 			"signature for channel announcement: %v", err)
 	}
-	bitcoinSig, err := f.cfg.SignMessage(localFundingKey, chanAnnMsg)
+	bitcoinSig, err := f.cfg.ChannelContextSigner.SignChannelAnnouncement(
+		chanID, localFundingKey, chanAnnMsg)
 	if err != nil {
 		return nil, errors.Errorf("unable to generate bitcoin "+
 			"signature for node public key: %v", err)
