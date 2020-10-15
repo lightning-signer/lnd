@@ -32,7 +32,7 @@ type NodeContextSigner interface {
 
 type ChannelContextSigner interface {
 	// Update signer with shim for external funding flow.
-	ShimKeyRing(keyRing keychain.SecretKeyRing) error
+	ShimKeyRing(keyRing keychain.KeyRing) error
 
 	// Inform the validating signer that a new channel is being created.
 	NewChannel(

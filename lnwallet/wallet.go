@@ -707,7 +707,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 			KeyRing:    keyRing,
 			ShimIntent: shimIntent,
 		}
-		err = l.Cfg.ChannelContextSigner.ShimKeyRing(l.SecretKeyRing)
+		err = l.Cfg.ChannelContextSigner.ShimKeyRing(keyRing)
 		if err != nil {
 			fundingIntent.Cancel()
 			req.err <- err

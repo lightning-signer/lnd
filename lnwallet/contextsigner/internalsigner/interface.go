@@ -16,9 +16,10 @@ import (
 )
 
 type InternalSigner struct {
-	signer      input.Signer
-	keyRing     keychain.SecretKeyRing
-	signMessage func(
+	signer        input.Signer
+	secretKeyRing keychain.SecretKeyRing
+	keyRing       keychain.KeyRing // separate for shimming
+	signMessage   func(
 		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error)
 	idKeyDesc     keychain.KeyDescriptor
 	nodeKeyECDH   *keychain.PubKeyECDH
@@ -35,9 +36,10 @@ func NewInternalSigner(
 	// We can't initialize the signers yet because the keyring is still
 	// locked. Record the arguments for later..
 	return &InternalSigner{
-		signer:      signer,
-		keyRing:     keyRing,
-		signMessage: signMessage,
+		signer:        signer,
+		secretKeyRing: keyRing,
+		keyRing:       keyRing, // separate for shimming
+		signMessage:   signMessage,
 	}, nil
 }
 
@@ -53,13 +55,14 @@ func (is *InternalSigner) Initialize() error {
 	if err != nil {
 		return err
 	}
-	is.nodeKeyECDH = keychain.NewPubKeyECDH(is.idKeyDesc, is.keyRing)
-	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(is.idKeyDesc, is.keyRing)
+	is.nodeKeyECDH = keychain.NewPubKeyECDH(is.idKeyDesc, is.secretKeyRing)
+	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(is.idKeyDesc, is.secretKeyRing)
 	is.nodeSigner = netann.NewNodeSigner(is.nodeKeySigner)
 	return nil
 }
 
-func (is *InternalSigner) ShimKeyRing(keyRing keychain.SecretKeyRing) error {
+func (is *InternalSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+	// Replace the non-secret keyring w/ shimmed version.
 	is.keyRing = keyRing
 	return nil
 }
@@ -68,6 +71,7 @@ func (is *InternalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
 ) (*lnwallet.ChannelBasepoints, error) {
+	// Use the non-secret keyring, it may have been shimmed.
 	var err error
 	var bps lnwallet.ChannelBasepoints
 	bps.MultiSigKey, err = is.keyRing.DeriveNextKey(

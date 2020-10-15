@@ -566,14 +566,14 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		return nil, err
 	}
 
-	// Now that the keyring is unlocked we can initialize the internal signer.
-	if err := internalSigner.Initialize(); err != nil {
-		fmt.Printf("unable to initialize internal signer: %v\n", err)
+	if err := lnWallet.Startup(); err != nil {
+		fmt.Printf("unable to start wallet: %v\n", err)
 		return nil, err
 	}
 
-	if err := lnWallet.Startup(); err != nil {
-		fmt.Printf("unable to start wallet: %v\n", err)
+	// Now that the keyring is unlocked we can initialize the internal signer.
+	if err := internalSigner.Initialize(); err != nil {
+		fmt.Printf("unable to initialize internal signer: %v\n", err)
 		return nil, err
 	}
 
