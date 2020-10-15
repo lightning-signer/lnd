@@ -327,16 +327,21 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 		return nil, err
 	}
 
+	internalSigner, err := internalsigner.NewInternalSigner(
+		signer, keyRing, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := lnwallet.Config{
-		Database:         cdb,
-		Notifier:         notifier,
-		SecretKeyRing:    keyRing,
-		WalletController: wc,
-		Signer:           signer,
-		ChannelContextSigner: internalsigner.NewInternalSigner(
-			signer, keyRing, nil),
-		ChainIO:      bio,
-		FeeEstimator: chainfee.NewStaticEstimator(2500, 0),
+		Database:             cdb,
+		Notifier:             notifier,
+		SecretKeyRing:        keyRing,
+		WalletController:     wc,
+		Signer:               signer,
+		ChannelContextSigner: internalSigner,
+		ChainIO:              bio,
+		FeeEstimator:         chainfee.NewStaticEstimator(2500, 0),
 		DefaultConstraints: channeldb.ChannelConstraints{
 			DustLimit:        500,
 			MaxPendingAmount: lnwire.NewMSatFromSatoshis(btcutil.SatoshiPerBitcoin) * 100,
@@ -353,6 +358,11 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 	}
 
 	if err := wallet.Startup(); err != nil {
+		return nil, err
+	}
+
+	// Now that the keyring is unlocked we can initialize the internal signer.
+	if err := internalSigner.Initialize(); err != nil {
 		return nil, err
 	}
 

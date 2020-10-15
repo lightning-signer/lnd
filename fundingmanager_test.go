@@ -336,12 +336,15 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 		RootKey: alicePrivKey,
 	}
 
-	internalSigner := internalsigner.NewInternalSigner(
+	internalSigner, err := internalsigner.NewInternalSigner(
 		signer, keyRing, func(pubKey *btcec.PublicKey,
 			msg []byte) (input.Signature, error) {
 			return testSig, nil
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	lnw, err := createTestWallet(
 		cdb, netParams, chainNotifier, wc, signer, keyRing, bio,
@@ -349,6 +352,11 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 	)
 	if err != nil {
 		t.Fatalf("unable to create test ln wallet: %v", err)
+	}
+
+	// Now that the keyring is unlocked we can initialize the internal signer.
+	if err := internalSigner.Initialize(); err != nil {
+		t.Fatalf("unable to initialize internal signer: %v", err)
 	}
 
 	var chanIDSeed [32]byte

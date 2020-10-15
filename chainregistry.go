@@ -533,13 +533,17 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	)
 	cc.keyRing = keyRing
 
-	internalSigner := internalsigner.NewInternalSigner(
+	internalSigner, err := internalsigner.NewInternalSigner(
 		cc.signer,
 		keyRing,
 		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {
 			return cc.msgSigner.SignMessage(pubKey, msg)
 		},
 	)
+	if err != nil {
+		fmt.Printf("unable to create internal signer: %v\n", err)
+		return nil, err
+	}
 	cc.channelContextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment
@@ -561,6 +565,13 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		fmt.Printf("unable to create wallet: %v\n", err)
 		return nil, err
 	}
+
+	// Now that the keyring is unlocked we can initialize the internal signer.
+	if err := internalSigner.Initialize(); err != nil {
+		fmt.Printf("unable to initialize internal signer: %v\n", err)
+		return nil, err
+	}
+
 	if err := lnWallet.Startup(); err != nil {
 		fmt.Printf("unable to start wallet: %v\n", err)
 		return nil, err

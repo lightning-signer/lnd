@@ -23,9 +23,6 @@ type NodeContextSigner interface {
 	// returned value is the sha256 of the compressed shared point.
 	ECDH(pubKey *btcec.PublicKey) ([32]byte, error)
 
-	// Generate the node signature for the channel announcement.
-	SignChannelAnnouncement(dataToSign []byte) (input.Signature, error)
-
 	// Generate the node signature for the node announcement.
 	SignNodeAnnouncement(dataToSign []byte) (input.Signature, error)
 
@@ -35,7 +32,7 @@ type NodeContextSigner interface {
 
 type ChannelContextSigner interface {
 	// Update signer with shim for external funding flow.
-	ShimKeyRing(keyRing keychain.KeyRing) error
+	ShimKeyRing(keyRing keychain.SecretKeyRing) error
 
 	// Inform the validating signer that a new channel is being created.
 	NewChannel(
@@ -73,10 +70,11 @@ type ChannelContextSigner interface {
 		theirCommitTx *wire.MsgTx,
 	) (input.Signature, error)
 
-	// Generate the funding signature for the channel announcement.
+	// Generate the both the node signature and the bitcoin (funding)
+	// signature for the channel announcement.
 	SignChannelAnnouncement(
 		chanID lnwire.ChannelID,
 		localFundingKey *btcec.PublicKey,
 		dataToSign []byte,
-	) (input.Signature, error)
+	) (input.Signature, input.Signature, error)
 }

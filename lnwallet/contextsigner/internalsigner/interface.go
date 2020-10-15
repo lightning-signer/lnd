@@ -12,34 +12,59 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
+	"github.com/lightningnetwork/lnd/netann"
 )
 
-type internalSigner struct {
+type InternalSigner struct {
 	signer      input.Signer
-	keyRing     keychain.KeyRing
+	keyRing     keychain.SecretKeyRing
 	signMessage func(
 		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error)
+	idKeyDesc     keychain.KeyDescriptor
+	nodeKeyECDH   *keychain.PubKeyECDH
+	nodeKeySigner *keychain.PubKeyDigestSigner
+	nodeSigner    *netann.NodeSigner
 }
 
 func NewInternalSigner(
 	signer input.Signer,
-	keyRing keychain.KeyRing,
+	keyRing keychain.SecretKeyRing,
 	signMessage func(
 		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error),
-) lnwallet.ChannelContextSigner {
-	return &internalSigner{
+) (*InternalSigner, error) {
+	// We can't initialize the signers yet because the keyring is still
+	// locked. Record the arguments for later..
+	return &InternalSigner{
 		signer:      signer,
 		keyRing:     keyRing,
 		signMessage: signMessage,
-	}
+	}, nil
 }
 
-func (is *internalSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+func (is *InternalSigner) Initialize() error {
+	// Once the keyring is unlocked we can setup the signers.
+	var err error
+	is.idKeyDesc, err = is.keyRing.DeriveKey(
+		keychain.KeyLocator{
+			Family: keychain.KeyFamilyNodeKey,
+			Index:  0,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	is.nodeKeyECDH = keychain.NewPubKeyECDH(is.idKeyDesc, is.keyRing)
+	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(is.idKeyDesc, is.keyRing)
+	is.nodeSigner = netann.NewNodeSigner(is.nodeKeySigner)
+	return nil
+}
+
+func (is *InternalSigner) ShimKeyRing(keyRing keychain.SecretKeyRing) error {
 	is.keyRing = keyRing
 	return nil
 }
 
-func (is *internalSigner) NewChannel(
+func (is *InternalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
 ) (*lnwallet.ChannelBasepoints, error) {
@@ -78,7 +103,7 @@ func (is *internalSigner) NewChannel(
 	return &bps, nil
 }
 
-func (is *internalSigner) ReadyChannel(
+func (is *InternalSigner) ReadyChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
 	isOutbound bool,
@@ -101,7 +126,7 @@ func (is *internalSigner) ReadyChannel(
 	return nil
 }
 
-func (is *internalSigner) SignRemoteCommitment(
+func (is *InternalSigner) SignRemoteCommitment(
 	ourContribution *lnwallet.ChannelContribution,
 	theirContribution *lnwallet.ChannelContribution,
 	partialState *channeldb.OpenChannel,
@@ -130,14 +155,25 @@ func (is *internalSigner) SignRemoteCommitment(
 	return is.signer.SignOutputRaw(theirCommitTx, &signDesc)
 }
 
-func (is *internalSigner) SignChannelAnnouncement(
+func (is *InternalSigner) SignChannelAnnouncement(
 	chanID lnwire.ChannelID,
 	localFundingKey *btcec.PublicKey,
 	dataToSign []byte,
-) (input.Signature, error) {
-	return is.signMessage(localFundingKey, dataToSign)
+) (input.Signature, input.Signature, error) {
+	nodeSig, err := is.nodeSigner.SignMessage(
+		is.nodeKeyECDH.PubKey(), dataToSign)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to generate node "+
+			"signature for channel announcement: %v", err)
+	}
+	bitcoinSig, err := is.signMessage(localFundingKey, dataToSign)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to generate bitcoin "+
+			"signature for channel announcement: %v", err)
+	}
+	return nodeSig, bitcoinSig, nil
 }
 
-// Compile time check to make sure internalSigner implements the
+// Compile time check to make sure InternalSigner implements the
 // requisite interfaces.
-var _ lnwallet.ChannelContextSigner = (*internalSigner)(nil)
+var _ lnwallet.ChannelContextSigner = (*InternalSigner)(nil)

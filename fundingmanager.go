@@ -2879,16 +2879,12 @@ func (f *fundingManager) newChanAnnouncement(localPubKey, remotePubKey,
 	if err != nil {
 		return nil, err
 	}
-	nodeSig, err := f.cfg.SignMessage(f.cfg.IDKey, chanAnnMsg)
+	nodeSig, bitcoinSig, err :=
+		f.cfg.ChannelContextSigner.SignChannelAnnouncement(
+			chanID, localFundingKey, chanAnnMsg)
 	if err != nil {
-		return nil, errors.Errorf("unable to generate node "+
-			"signature for channel announcement: %v", err)
-	}
-	bitcoinSig, err := f.cfg.ChannelContextSigner.SignChannelAnnouncement(
-		chanID, localFundingKey, chanAnnMsg)
-	if err != nil {
-		return nil, errors.Errorf("unable to generate bitcoin "+
-			"signature for node public key: %v", err)
+		return nil, errors.Errorf("unable to generate node and bitcoin "+
+			"signatures for channel announcement: %v", err)
 	}
 
 	// Finally, we'll generate the announcement proof which we'll use to
