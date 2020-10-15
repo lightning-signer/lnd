@@ -14,6 +14,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
+	"github.com/lightningnetwork/lnd/lnwire"
 )
 
 // TEMPORARY - The ShadowSigner is used to validate the remotesigner
@@ -224,6 +225,34 @@ func (ss *shadowSigner) SignRemoteCommitment(
 			"internal=%v remote=%v", sig0, sig1)
 	}
 	return sig1, nil
+}
+
+func (ss *shadowSigner) SignChannelAnnouncement(
+	chanID lnwire.ChannelID,
+	localFundingKey *btcec.PublicKey,
+	dataToSign []byte,
+) (input.Signature, input.Signature, error) {
+	nodeSig0, bitcoinSig0, err := ss.internalSigner.SignChannelAnnouncement(
+		chanID, localFundingKey, dataToSign)
+	if err != nil {
+		return nil, nil, err
+	}
+	nodeSig1, bitcoinSig1, err := ss.remoteSigner.SignChannelAnnouncement(
+		chanID, localFundingKey, dataToSign)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !reflect.DeepEqual(nodeSig0, nodeSig1) {
+		return nil, nil, fmt.Errorf("ShadowSigner.SignChannelAnnouncement "+
+			"node sig mismatch: "+
+			"internal=%v remote=%v", nodeSig0, nodeSig1)
+	}
+	if !reflect.DeepEqual(bitcoinSig0, bitcoinSig1) {
+		return nil, nil, fmt.Errorf("ShadowSigner.SignChannelAnnouncement "+
+			"bitcoin sig mismatch: "+
+			"internal=%v remote=%v", bitcoinSig0, bitcoinSig1)
+	}
+	return nodeSig1, bitcoinSig1, nil
 }
 
 func logBasepoints(pfx string, bps *lnwallet.ChannelBasepoints) {

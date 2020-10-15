@@ -3,7 +3,6 @@ package remotesigner
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"google.golang.org/grpc"
 )
 
@@ -272,7 +272,7 @@ func (rsi *RemoteSigner) ReadyChannel(
 	}
 
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
-	channelNoncePermanent := channelNoncePermanent(fundingOutpoint)
+	chanID := lnwire.NewChanIDFromOutPoint(fundingOutpoint)
 
 	var commitmentType ReadyChannelRequest_CommitmentType
 	if chanType.HasAnchors() {
@@ -290,7 +290,7 @@ func (rsi *RemoteSigner) ReadyChannel(
 		&ReadyChannelRequest{
 			NodeId:             &NodeId{Data: rsi.nodeID[:]},
 			ChannelNonce0:      &ChannelNonce{Data: channelNonceInitial},
-			OptionChannelNonce: &ChannelNonce{Data: channelNoncePermanent},
+			OptionChannelNonce: &ChannelNonce{Data: chanID[:]},
 			IsOutbound:         isOutbound,
 			ChannelValueSat:    channelValueSat,
 			PushValueMsat:      pushValueMsat,
@@ -366,7 +366,7 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 		return nil, err
 	}
 
-	channelNonce := channelNoncePermanent(fundingOutpoint)
+	chanID := lnwire.NewChanIDFromOutPoint(fundingOutpoint)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -396,7 +396,7 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	rsp, err := rsi.client.SignRemoteCommitmentTx(ctx,
 		&SignRemoteCommitmentTxRequest{
 			NodeId:       &NodeId{Data: rsi.nodeID[:]},
-			ChannelNonce: &ChannelNonce{Data: channelNonce},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
 			RemotePerCommitPoint: &PubKey{
 				Data: remotePerCommitPoint.SerializeCompressed(),
 			},
@@ -416,25 +416,43 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
 }
 
+func (rsi *RemoteSigner) SignChannelAnnouncement(
+	chanID lnwire.ChannelID,
+	localFundingKey *btcec.PublicKey,
+	dataToSign []byte,
+) (input.Signature, input.Signature, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.SignChannelAnnouncement(ctx,
+		&SignChannelAnnouncementRequest{
+			NodeId:              &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce:        &ChannelNonce{Data: chanID[:]},
+			ChannelAnnouncement: dataToSign,
+		},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeSig, err := btcec.ParseDERSignature(
+		rsp.NodeSignature.Data, btcec.S256())
+	if err != nil {
+		return nil, nil, err
+	}
+	bitcoinSig, err := btcec.ParseDERSignature(
+		rsp.BitcoinSignature.Data, btcec.S256())
+	if err != nil {
+		return nil, nil, err
+	}
+	return nodeSig, bitcoinSig, nil
+}
+
 func channelNonceInitial(peerNode *btcec.PublicKey,
 	pendingChanID [32]byte) []byte {
 	retval := peerNode.SerializeCompressed()
 	retval = append(retval, pendingChanID[:]...)
 	log.Debugf("channelNonceInitial: %s", hex.EncodeToString(retval))
-	return retval
-}
-
-func channelNoncePermanent(fundingOutpoint *wire.OutPoint) []byte {
-	var chanPointBuf bytes.Buffer
-	if _, err := chanPointBuf.Write(fundingOutpoint.Hash[:]); err != nil {
-		panic(fmt.Sprintf("channelNoncePermanent: hash write failed: %v", err))
-	}
-	if err := binary.Write(
-		&chanPointBuf, binary.BigEndian, fundingOutpoint.Index); err != nil {
-		panic(fmt.Sprintf("channelNoncePermanent: index write failed: %v", err))
-	}
-	retval := chanPointBuf.Bytes()
-	log.Debugf("channelNoncePermanent: %s", hex.EncodeToString(retval))
 	return retval
 }
 
