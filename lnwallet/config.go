@@ -39,13 +39,13 @@ type Config struct {
 	// used to generate signature for all inputs to potential funding
 	// transactions, as well as for spends from the funding transaction to
 	// update the commitment state.
-	// TODO: Remove this when the ChannelContextSigner is complete.
+	// TODO: Remove this when the ContextSigner is complete.
 	Signer input.Signer
 
-	// The wallet's current ChannelContextSigner implementation.
+	// The wallet's current ContextSigner implementation.
 	// NOTE: This signer will subsume the input.Signer above when
-	// the ChannelContextSigner implementation is complete.
-	ChannelContextSigner ChannelContextSigner
+	// the ContextSigner implementation is complete.
+	ContextSigner ContextSigner
 
 	// FeeEstimator is the implementation that the wallet will use for the
 	// calculation of on-chain transaction fees.

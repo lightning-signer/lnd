@@ -707,7 +707,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 			KeyRing:    keyRing,
 			ShimIntent: shimIntent,
 		}
-		err = l.Cfg.ChannelContextSigner.ShimKeyRing(keyRing)
+		err = l.Cfg.ContextSigner.ShimKeyRing(keyRing)
 		if err != nil {
 			fundingIntent.Cancel()
 			req.err <- err
@@ -796,7 +796,7 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.nodeAddr = nodeAddr
 	reservation.partialState.IdentityPub = nodeID
 
-	bps, err := l.Cfg.ChannelContextSigner.NewChannel(
+	bps, err := l.Cfg.ContextSigner.NewChannel(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
@@ -1129,12 +1129,12 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		}
 	}
 
-	// We received accept_channel, update the ChannelContextSigner
+	// We received accept_channel, update the ContextSigner
 	// with information needed to validate signature requests.
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.Cfg.ChannelContextSigner.ReadyChannel(
+	err := l.Cfg.ContextSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1153,8 +1153,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		pstate.ChanType,
 	)
 	if err != nil {
-		req.err <- fmt.Errorf(
-			"ChannelContextSigner.ReadyChannel failed: %v", err)
+		req.err <- fmt.Errorf("ContextSigner.ReadyChannel failed: %v", err)
 		return
 	}
 
@@ -1238,7 +1237,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	chanState.LocalCommitment.CommitTx = ourCommitTx
 	chanState.RemoteCommitment.CommitTx = theirCommitTx
 
-	sigTheirCommit, err := l.Cfg.ChannelContextSigner.SignRemoteCommitment(
+	sigTheirCommit, err := l.Cfg.ContextSigner.SignRemoteCommitment(
 		ourContribution,
 		theirContribution,
 		pendingReservation.partialState,
@@ -1512,11 +1511,11 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	chanState.FundingOutpoint = *req.fundingOutpoint
 	fundingTxIn := wire.NewTxIn(req.fundingOutpoint, nil, nil)
 
-	// We received funding_created, update the ChannelContextSigner.
+	// We received funding_created, update the ContextSigner.
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.Cfg.ChannelContextSigner.ReadyChannel(
+	err := l.Cfg.ContextSigner.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1535,8 +1534,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		pstate.ChanType,
 	)
 	if err != nil {
-		req.err <- fmt.Errorf(
-			"ChannelContextSigner.ReadyChannel failed: %v", err)
+		req.err <- fmt.Errorf("ContextSigner.ReadyChannel failed: %v", err)
 		return
 	}
 

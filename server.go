@@ -346,7 +346,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 
 	var (
 		err           error
-		nodeKeyECDH   = keychain.NewPubKeyECDH(*nodeKeyDesc, cc.keyRing)
+		nodeKeyECDH   = cc.contextSigner
 		nodeKeySigner = keychain.NewPubKeyDigestSigner(
 			*nodeKeyDesc, cc.keyRing,
 		)
@@ -1004,7 +1004,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 
 			return cc.msgSigner.SignMessage(pubKey, msg)
 		},
-		ChannelContextSigner: cc.channelContextSigner,
+		ContextSigner: cc.contextSigner,
 		CurrentNodeAnnouncement: func() (lnwire.NodeAnnouncement, error) {
 			return s.genNodeAnnouncement(true)
 		},

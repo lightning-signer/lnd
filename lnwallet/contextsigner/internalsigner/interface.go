@@ -56,9 +56,28 @@ func (is *InternalSigner) Initialize() error {
 		return err
 	}
 	is.nodeKeyECDH = keychain.NewPubKeyECDH(is.idKeyDesc, is.secretKeyRing)
-	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(is.idKeyDesc, is.secretKeyRing)
+	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(
+		is.idKeyDesc, is.secretKeyRing)
 	is.nodeSigner = netann.NewNodeSigner(is.nodeKeySigner)
 	return nil
+}
+
+func (is *InternalSigner) PubKey() *btcec.PublicKey {
+	return is.nodeKeyECDH.PubKey()
+}
+
+func (is *InternalSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	return is.nodeKeyECDH.ECDH(pubKey)
+}
+
+func (is *InternalSigner) SignNodeAnnouncement(
+	dataToSign []byte) (input.Signature, error) {
+	return nil, fmt.Errorf("InternalSigner SignAnnouncement unimplemented")
+}
+
+func (is *InternalSigner) SignChannelUpdate(
+	dataToSign []byte) (input.Signature, error) {
+	return nil, fmt.Errorf("InternalSigner SignChannelUpdate unimplemented")
 }
 
 func (is *InternalSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
@@ -180,4 +199,4 @@ func (is *InternalSigner) SignChannelAnnouncement(
 
 // Compile time check to make sure InternalSigner implements the
 // requisite interfaces.
-var _ lnwallet.ChannelContextSigner = (*InternalSigner)(nil)
+var _ lnwallet.ContextSigner = (*InternalSigner)(nil)

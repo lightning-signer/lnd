@@ -261,20 +261,20 @@ func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 	notifier chainntnfs.ChainNotifier, wc lnwallet.WalletController,
 	signer input.Signer, keyRing keychain.SecretKeyRing,
 	bio lnwallet.BlockChainIO, estimator chainfee.Estimator,
-	internalSigner lnwallet.ChannelContextSigner,
+	internalSigner lnwallet.ContextSigner,
 ) (*lnwallet.LightningWallet, error) {
 
 	wallet, err := lnwallet.NewLightningWallet(lnwallet.Config{
-		Database:             cdb,
-		Notifier:             notifier,
-		SecretKeyRing:        keyRing,
-		WalletController:     wc,
-		Signer:               signer,
-		ChannelContextSigner: internalSigner,
-		ChainIO:              bio,
-		FeeEstimator:         estimator,
-		NetParams:            *netParams,
-		DefaultConstraints:   defaultBtcChannelConstraints,
+		Database:           cdb,
+		Notifier:           notifier,
+		SecretKeyRing:      keyRing,
+		WalletController:   wc,
+		Signer:             signer,
+		ContextSigner:      internalSigner,
+		ChainIO:            bio,
+		FeeEstimator:       estimator,
+		NetParams:          *netParams,
+		DefaultConstraints: defaultBtcChannelConstraints,
 	})
 	if err != nil {
 		return nil, err
@@ -373,7 +373,7 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 
 			return testSig, nil
 		},
-		ChannelContextSigner: internalSigner,
+		ContextSigner: internalSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 
@@ -519,7 +519,7 @@ func recreateAliceFundingManager(t *testing.T, alice *testNode) {
 			msg []byte) (input.Signature, error) {
 			return testSig, nil
 		},
-		ChannelContextSigner: oldCfg.ChannelContextSigner,
+		ContextSigner: oldCfg.ContextSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 

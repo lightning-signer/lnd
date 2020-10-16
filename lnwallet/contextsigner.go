@@ -10,15 +10,18 @@ import (
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
-type ChannelBasepoints struct {
-	MultiSigKey         keychain.KeyDescriptor
-	RevocationBasePoint keychain.KeyDescriptor
-	HtlcBasePoint       keychain.KeyDescriptor
-	PaymentBasePoint    keychain.KeyDescriptor
-	DelayBasePoint      keychain.KeyDescriptor
+type ContextSigner interface {
+	// NodeContextSigner can sign in node-specific contexts.
+	NodeContextSigner
+
+	// ChannelContextSigner can sign in channel-specific contexts.
+	ChannelContextSigner
 }
 
 type NodeContextSigner interface {
+	// PubKey returns the node identity public key.
+	PubKey() *btcec.PublicKey
+
 	// ECDH performs an ECDH operation between pub and priv. The
 	// returned value is the sha256 of the compressed shared point.
 	ECDH(pubKey *btcec.PublicKey) ([32]byte, error)
@@ -78,3 +81,15 @@ type ChannelContextSigner interface {
 		dataToSign []byte,
 	) (input.Signature, input.Signature, error)
 }
+
+type ChannelBasepoints struct {
+	MultiSigKey         keychain.KeyDescriptor
+	RevocationBasePoint keychain.KeyDescriptor
+	HtlcBasePoint       keychain.KeyDescriptor
+	PaymentBasePoint    keychain.KeyDescriptor
+	DelayBasePoint      keychain.KeyDescriptor
+}
+
+// Compile time check to make sure ContextSigners implement the
+// requisite interfaces.
+var _ keychain.SingleKeyECDH = (NodeContextSigner)(nil)

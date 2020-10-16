@@ -141,7 +141,7 @@ type chainControl struct {
 
 	signer input.Signer
 
-	channelContextSigner lnwallet.ChannelContextSigner
+	contextSigner lnwallet.ContextSigner
 
 	keyRing keychain.SecretKeyRing
 
@@ -544,21 +544,21 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		fmt.Printf("unable to create internal signer: %v\n", err)
 		return nil, err
 	}
-	cc.channelContextSigner = internalSigner
+	cc.contextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
 	walletCfg := lnwallet.Config{
-		Database:             remoteDB,
-		Notifier:             cc.chainNotifier,
-		WalletController:     wc,
-		Signer:               cc.signer,
-		ChannelContextSigner: cc.channelContextSigner,
-		FeeEstimator:         cc.feeEstimator,
-		SecretKeyRing:        keyRing,
-		ChainIO:              cc.chainIO,
-		DefaultConstraints:   channelConstraints,
-		NetParams:            *cfg.ActiveNetParams.Params,
+		Database:           remoteDB,
+		Notifier:           cc.chainNotifier,
+		WalletController:   wc,
+		Signer:             cc.signer,
+		ContextSigner:      cc.contextSigner,
+		FeeEstimator:       cc.feeEstimator,
+		SecretKeyRing:      keyRing,
+		ChainIO:            cc.chainIO,
+		DefaultConstraints: channelConstraints,
+		NetParams:          *cfg.ActiveNetParams.Params,
 	}
 	lnWallet, err := lnwallet.NewLightningWallet(walletCfg)
 	if err != nil {
