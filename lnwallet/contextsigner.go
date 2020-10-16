@@ -11,10 +11,10 @@ import (
 )
 
 type ContextSigner interface {
-	// NodeContextSigner can sign in node-specific contexts.
+	// NodeContextSigner is used to sign in node-specific contexts.
 	NodeContextSigner
 
-	// ChannelContextSigner can sign in channel-specific contexts.
+	// ChannelContextSigner is used to sign in channel-specific contexts.
 	ChannelContextSigner
 }
 
