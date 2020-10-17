@@ -336,8 +336,8 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 		RootKey: alicePrivKey,
 	}
 
-	internalSigner, err := internalsigner.NewInternalSigner(
-		signer, keyRing, func(pubKey *btcec.PublicKey,
+	internalSigner := internalsigner.NewInternalSigner(
+		keyRing, signer, func(pubKey *btcec.PublicKey,
 			msg []byte) (input.Signature, error) {
 			return testSig, nil
 		},
@@ -364,15 +364,10 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 	chainedAcceptor := chanacceptor.NewChainedAcceptor()
 
 	fundingCfg := fundingConfig{
-		IDKey:        privKey.PubKey(),
-		Wallet:       lnw,
-		Notifier:     chainNotifier,
-		FeeEstimator: estimator,
-		SignMessage: func(pubKey *btcec.PublicKey,
-			msg []byte) (input.Signature, error) {
-
-			return testSig, nil
-		},
+		IDKey:         privKey.PubKey(),
+		Wallet:        lnw,
+		Notifier:      chainNotifier,
+		FeeEstimator:  estimator,
 		ContextSigner: internalSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
@@ -511,14 +506,10 @@ func recreateAliceFundingManager(t *testing.T, alice *testNode) {
 	chainedAcceptor := chanacceptor.NewChainedAcceptor()
 
 	f, err := newFundingManager(fundingConfig{
-		IDKey:        oldCfg.IDKey,
-		Wallet:       oldCfg.Wallet,
-		Notifier:     oldCfg.Notifier,
-		FeeEstimator: oldCfg.FeeEstimator,
-		SignMessage: func(pubKey *btcec.PublicKey,
-			msg []byte) (input.Signature, error) {
-			return testSig, nil
-		},
+		IDKey:         oldCfg.IDKey,
+		Wallet:        oldCfg.Wallet,
+		Notifier:      oldCfg.Notifier,
+		FeeEstimator:  oldCfg.FeeEstimator,
 		ContextSigner: oldCfg.ContextSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {

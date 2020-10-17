@@ -9,6 +9,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 
 	"github.com/lightningnetwork/lnd/input"
+	"github.com/lightningnetwork/lnd/keychain"
+	"github.com/lightningnetwork/lnd/netann"
 )
 
 // DummySignature is a dummy Signature implementation.
@@ -40,6 +42,53 @@ func (d *DummySigner) ComputeInputScript(tx *wire.MsgTx,
 	signDesc *input.SignDescriptor) (*input.Script, error) {
 
 	return &input.Script{}, nil
+}
+
+// SingleNodeContextSigner is an implementation of the NodeContextSigner
+// interface that signs everything with a single private key.
+type SingleNodeContextSigner struct {
+	nodeKeyECDH *keychain.PrivKeyECDH
+	nodeSigner  *netann.NodeSigner
+}
+
+func NewSingleNodeContextSigner(
+	privKey *btcec.PrivateKey) *SingleNodeContextSigner {
+	privKeySigner := &keychain.PrivKeyDigestSigner{PrivKey: privKey}
+	return &SingleNodeContextSigner{
+		nodeKeyECDH: &keychain.PrivKeyECDH{PrivKey: privKey},
+		nodeSigner:  netann.NewNodeSigner(privKeySigner),
+	}
+}
+
+func (cs *SingleNodeContextSigner) PubKey() *btcec.PublicKey {
+	return cs.nodeKeyECDH.PubKey()
+}
+
+func (cs *SingleNodeContextSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	return cs.nodeKeyECDH.ECDH(pubKey)
+}
+
+func (cs *SingleNodeContextSigner) SignNodeAnnouncement(
+	dataToSign []byte) (input.Signature, error) {
+	return cs.nodeSigner.SignMessage(cs.PubKey(), dataToSign)
+}
+
+func (cs *SingleNodeContextSigner) SignChannelUpdate(
+	dataToSign []byte) (input.Signature, error) {
+	return cs.nodeSigner.SignMessage(cs.PubKey(), dataToSign)
+}
+
+func (cs *SingleNodeContextSigner) SignInvoice(
+	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
+	toSign := append([]byte(hrp), taggedFieldsBytes...)
+	hash := chainhash.HashB(toSign)
+	sign, err := cs.nodeSigner.SignDigestCompact(hash)
+	return hash, sign, err
+}
+
+func (cs *SingleNodeContextSigner) SignMessage(
+	dataToSign []byte) ([]byte, error) {
+	return cs.nodeSigner.SignCompact(dataToSign)
 }
 
 // SingleSigner is an implementation of the Signer interface that signs

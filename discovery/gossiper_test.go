@@ -741,7 +741,7 @@ func createTestCtx(startHeight uint32) (*testCtx, func(), error) {
 		RotateTicker:         ticker.NewForce(DefaultSyncerRotationInterval),
 		HistoricalSyncTicker: ticker.NewForce(DefaultHistoricalSyncInterval),
 		NumActiveSyncers:     3,
-		AnnSigner:            &mock.SingleSigner{Privkey: nodeKeyPriv1},
+		AnnSigner:            mock.NewSingleNodeContextSigner(nodeKeyPriv1),
 		SubBatchDelay:        time.Second * 5,
 		MinimumBatchSize:     10,
 	}, nodeKeyPub1)

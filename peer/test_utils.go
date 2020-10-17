@@ -23,7 +23,6 @@ import (
 	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
-	"github.com/lightningnetwork/lnd/lnwallet/contextsigner/internalsigner"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/netann"
 	"github.com/lightningnetwork/lnd/queue"
@@ -111,7 +110,6 @@ func createTestPeer(notifier chainntnfs.ChainNotifier,
 	aliceKeyPriv, aliceKeyPub := btcec.PrivKeyFromBytes(
 		btcec.S256(), alicesPrivKey,
 	)
-	aliceKeySigner := &keychain.PrivKeyDigestSigner{PrivKey: aliceKeyPriv}
 	bobKeyPriv, bobKeyPub := btcec.PrivKeyFromBytes(
 		btcec.S256(), bobsPrivKey,
 	)
@@ -380,8 +378,6 @@ func createTestPeer(notifier chainntnfs.ChainNotifier,
 		return nil, nil, nil, err
 	}
 
-	nodeSignerAlice := netann.NewNodeSigner(aliceKeySigner)
-
 	const chanActiveTimeout = time.Minute
 
 	chanStatusMgr, err := netann.NewChanStatusManager(&netann.ChanStatusConfig{
@@ -390,7 +386,7 @@ func createTestPeer(notifier chainntnfs.ChainNotifier,
 		ChanDisableTimeout:       2 * time.Minute,
 		DB:                       dbAlice,
 		Graph:                    dbAlice.ChannelGraph(),
-		MessageSigner:            internalsigner.NewNodeSignerOnly(nodeSignerAlice),
+		MessageSigner:            mock.NewSingleNodeContextSigner(aliceKeyPriv),
 		OurPubKey:                aliceKeyPub,
 		IsChannelActive:          htlcSwitch.HasActiveLink,
 		ApplyChannelUpdate:       func(*lnwire.ChannelUpdate) error { return nil },

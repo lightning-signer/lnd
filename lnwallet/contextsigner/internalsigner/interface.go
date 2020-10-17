@@ -42,14 +42,6 @@ func NewInternalSigner(
 	}
 }
 
-// This constructor can be used in testing contexts where only
-// the lnwallet.MessageSigner subset of methods is needed (testing).
-func NewNodeSignerOnly(nodeSigner *netann.NodeSigner) *InternalSigner {
-	return &InternalSigner{
-		nodeSigner: nodeSigner,
-	}
-}
-
 func (is *InternalSigner) Initialize() error {
 	// Once the keyring is unlocked we can setup the signers.
 	idKeyDesc, err := is.publicKeyRing.DeriveKey(
@@ -88,15 +80,9 @@ func (is *InternalSigner) SignChannelUpdate(
 
 func (is *InternalSigner) SignInvoice(
 	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
-
 	toSign := append([]byte(hrp), taggedFieldsBytes...)
 	hash := chainhash.HashB(toSign)
-
-	// We use compact signature format, and also encoded the recovery ID
-	// such that a reader of the invoice can recover our pubkey from the
-	// signature.
-	sign, err := is.nodeSigner.SignCompact(hash)
-
+	sign, err := is.nodeSigner.SignDigestCompact(hash)
 	return hash, sign, err
 }
 

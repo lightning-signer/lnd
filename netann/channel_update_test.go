@@ -7,7 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/lightningnetwork/lnd/input"
-	"github.com/lightningnetwork/lnd/keychain"
+	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/netann"
@@ -18,21 +18,38 @@ type mockSigner struct {
 	err error
 }
 
-func (m *mockSigner) SignMessage(pk *btcec.PublicKey,
-	msg []byte) (input.Signature, error) {
-
-	if m.err != nil {
-		return nil, m.err
-	}
-
-	return nil, nil
+func (ms *mockSigner) PubKey() *btcec.PublicKey {
+	return nil
 }
 
-var _ lnwallet.MessageSigner = (*mockSigner)(nil)
+func (ms *mockSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	return [32]byte{}, ms.err
+}
+
+func (ms *mockSigner) SignNodeAnnouncement(
+	dataToSign []byte) (input.Signature, error) {
+	return nil, ms.err
+}
+
+func (ms *mockSigner) SignChannelUpdate(
+	dataToSign []byte) (input.Signature, error) {
+	return nil, ms.err
+}
+
+func (ms *mockSigner) SignInvoice(
+	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
+	return nil, nil, ms.err
+}
+
+func (ms *mockSigner) SignMessage(
+	dataToSign []byte) ([]byte, error) {
+	return nil, ms.err
+}
+
+var _ lnwallet.NodeContextSigner = (*mockSigner)(nil)
 
 var (
-	privKey, _    = btcec.NewPrivateKey(btcec.S256())
-	privKeySigner = &keychain.PrivKeyDigestSigner{PrivKey: privKey}
+	privKey, _ = btcec.NewPrivateKey(btcec.S256())
 
 	pubKey = privKey.PubKey()
 
@@ -44,9 +61,11 @@ type updateDisableTest struct {
 	startEnabled bool
 	disable      bool
 	startTime    time.Time
-	signer       lnwallet.MessageSigner
+	signer       lnwallet.NodeContextSigner
 	expErr       error
 }
+
+var testMessageSigner = mock.NewSingleNodeContextSigner(privKey)
 
 var updateDisableTests = []updateDisableTest{
 	{
@@ -54,35 +73,35 @@ var updateDisableTests = []updateDisableTest{
 		startEnabled: true,
 		disable:      true,
 		startTime:    time.Now(),
-		signer:       netann.NewNodeSigner(privKeySigner),
+		signer:       testMessageSigner,
 	},
 	{
 		name:         "working signer enabled to enabled",
 		startEnabled: true,
 		disable:      false,
 		startTime:    time.Now(),
-		signer:       netann.NewNodeSigner(privKeySigner),
+		signer:       testMessageSigner,
 	},
 	{
 		name:         "working signer disabled to enabled",
 		startEnabled: false,
 		disable:      false,
 		startTime:    time.Now(),
-		signer:       netann.NewNodeSigner(privKeySigner),
+		signer:       testMessageSigner,
 	},
 	{
 		name:         "working signer disabled to disabled",
 		startEnabled: false,
 		disable:      true,
 		startTime:    time.Now(),
-		signer:       netann.NewNodeSigner(privKeySigner),
+		signer:       testMessageSigner,
 	},
 	{
 		name:         "working signer future monotonicity",
 		startEnabled: true,
 		disable:      true,
 		startTime:    time.Now().Add(time.Hour), // must increment
-		signer:       netann.NewNodeSigner(privKeySigner),
+		signer:       testMessageSigner,
 	},
 	{
 		name:      "failing signer",

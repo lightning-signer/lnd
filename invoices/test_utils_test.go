@@ -15,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/clock"
+	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/lntypes"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/record"
@@ -69,15 +70,7 @@ var (
 
 	testNetParams = &chaincfg.MainNetParams
 
-	testMessageSigner = zpay32.MessageSigner{
-		SignCompact: func(hash []byte) ([]byte, error) {
-			sig, err := btcec.SignCompact(btcec.S256(), testPrivKey, hash, true)
-			if err != nil {
-				return nil, fmt.Errorf("can't sign the message: %v", err)
-			}
-			return sig, nil
-		},
-	}
+	testMessageSigner = mock.NewSingleNodeContextSigner(testPrivKey)
 
 	testFeatures = lnwire.NewFeatureVector(
 		nil, lnwire.Features,
