@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	bitcoinCfg "github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
+	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/zpay32"
 	litecoinCfg "github.com/ltcsuite/ltcd/chaincfg"
 )
@@ -144,25 +145,6 @@ func TestMigrateInvoicesHodl(t *testing.T) {
 		true)
 }
 
-// signDigestCompact generates a test signature to be used in the generation of
-// test payment requests.
-func signDigestCompact(hash []byte) ([]byte, error) {
-	// Should the signature reference a compressed public key or not.
-	isCompressedKey := true
-
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), testPrivKeyBytes)
-
-	// btcec.SignCompact returns a pubkey-recoverable signature
-	sig, err := btcec.SignCompact(
-		btcec.S256(), privKey, hash, isCompressedKey,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't sign the hash: %v", err)
-	}
-
-	return sig, nil
-}
-
 // getPayReq creates a payment request for the given net.
 func getPayReq(net *bitcoinCfg.Params) (string, error) {
 	options := []func(*zpay32.Invoice){
@@ -176,9 +158,7 @@ func getPayReq(net *bitcoinCfg.Params) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return payReq.Encode(
-		zpay32.MessageSigner{
-			SignCompact: signDigestCompact,
-		},
-	)
+
+	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), testPrivKeyBytes)
+	return payReq.Encode(NewSingleNodeContextSigner(privKey))
 }
