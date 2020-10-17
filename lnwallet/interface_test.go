@@ -327,8 +327,7 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 		return nil, err
 	}
 
-	internalSigner, err := internalsigner.NewInternalSigner(
-		signer, keyRing, nil)
+	internalSigner := internalsigner.NewInternalSigner(keyRing, signer, nil)
 	if err != nil {
 		return nil, err
 	}

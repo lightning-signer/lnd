@@ -39,7 +39,7 @@ func NodeAnnSetTimestamp(nodeAnn *lnwire.NodeAnnouncement) {
 // lnwire.NodeAnnouncement, then signs the resulting announcement. The provided
 // update should be the most recent, valid update, otherwise the timestamp may
 // not monotonically increase from the prior.
-func SignNodeAnnouncement(signer lnwallet.MessageSigner,
+func SignNodeAnnouncement(signer lnwallet.NodeContextSigner,
 	pubKey *btcec.PublicKey, nodeAnn *lnwire.NodeAnnouncement,
 	mods ...NodeAnnModifier) error {
 
@@ -49,7 +49,11 @@ func SignNodeAnnouncement(signer lnwallet.MessageSigner,
 	}
 
 	// Create the DER-encoded ECDSA signature over the message digest.
-	sig, err := SignAnnouncement(signer, pubKey, nodeAnn)
+	dataToSign, err := nodeAnn.DataToSign()
+	if err != nil {
+		return err
+	}
+	sig, err := signer.SignNodeAnnouncement(dataToSign)
 	if err != nil {
 		return err
 	}

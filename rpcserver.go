@@ -1430,7 +1430,7 @@ func (r *rpcServer) SignMessage(ctx context.Context,
 	}
 
 	in.Msg = append(signedMsgPrefix, in.Msg...)
-	sigBytes, err := r.server.nodeSigner.SignCompact(in.Msg)
+	sigBytes, err := r.server.nodeSigner.SignMessage(in.Msg)
 	if err != nil {
 		return nil, err
 	}

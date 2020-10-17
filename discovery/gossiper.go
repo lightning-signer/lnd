@@ -185,14 +185,11 @@ type Config struct {
 	// use to determine which messages need to be resent for a given peer.
 	MessageStore GossipMessageStore
 
-	// AnnSigner is an instance of the MessageSigner interface which will
-	// be used to manually sign any outgoing channel updates. The signer
-	// implementation should be backed by the public key of the backing
-	// Lightning node.
+	// AnnSigner signs messages that validate under OurPubKey.
 	//
 	// TODO(roasbeef): extract ann crafting + sign from fundingMgr into
 	// here?
-	AnnSigner lnwallet.MessageSigner
+	AnnSigner lnwallet.NodeContextSigner
 
 	// NumActiveSyncers is the number of peers for which we should have
 	// active syncers with. After reaching NumActiveSyncers, any future

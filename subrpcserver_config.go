@@ -19,9 +19,9 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc/walletrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/watchtowerrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/wtclientrpc"
+	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/macaroons"
-	"github.com/lightningnetwork/lnd/netann"
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/sweep"
 	"github.com/lightningnetwork/lnd/watchtower"
@@ -89,7 +89,7 @@ func (s *subRPCServerConfigs) PopulateDependencies(cfg *Config, cc *chainControl
 	activeNetParams *chaincfg.Params,
 	chanRouter *routing.ChannelRouter,
 	routerBackend *routerrpc.RouterBackend,
-	nodeSigner *netann.NodeSigner,
+	nodeSigner lnwallet.NodeContextSigner,
 	chanDB *channeldb.DB,
 	sweeper *sweep.UtxoSweeper,
 	tower *watchtower.Standalone,

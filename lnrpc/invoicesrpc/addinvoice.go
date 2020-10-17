@@ -16,8 +16,8 @@ import (
 
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/lntypes"
+	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/lightningnetwork/lnd/netann"
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -35,9 +35,8 @@ type AddInvoiceConfig struct {
 	// that are marshalled over rpc.
 	ChainParams *chaincfg.Params
 
-	// NodeSigner is an implementation of the MessageSigner implementation
-	// that's backed by the identity private key of the running lnd node.
-	NodeSigner *netann.NodeSigner
+	// NodeSigner is an implementation of the NodeContextSigner interface.
+	NodeSigner lnwallet.NodeContextSigner
 
 	// DefaultCLTVExpiry is the default invoice expiry if no values is
 	// specified.
@@ -289,11 +288,7 @@ func AddInvoice(ctx context.Context, cfg *AddInvoiceConfig,
 		return nil, nil, err
 	}
 
-	payReqString, err := payReq.Encode(
-		zpay32.MessageSigner{
-			SignCompact: cfg.NodeSigner.SignDigestCompact,
-		},
-	)
+	payReqString, err := payReq.Encode(cfg.NodeSigner)
 	if err != nil {
 		return nil, nil, err
 	}

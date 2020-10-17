@@ -38,7 +38,7 @@ type ChanStatusConfig struct {
 	OurPubKey *btcec.PublicKey
 
 	// MessageSigner signs messages that validate under OurPubKey.
-	MessageSigner lnwallet.MessageSigner
+	MessageSigner lnwallet.NodeContextSigner
 
 	// IsChannelActive checks whether the channel identified by the provided
 	// ChannelID is considered active. This should only return true if the

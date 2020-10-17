@@ -533,17 +533,13 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	)
 	cc.keyRing = keyRing
 
-	internalSigner, err := internalsigner.NewInternalSigner(
-		cc.signer,
+	internalSigner := internalsigner.NewInternalSigner(
 		keyRing,
+		cc.signer,
 		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {
 			return cc.msgSigner.SignMessage(pubKey, msg)
 		},
 	)
-	if err != nil {
-		fmt.Printf("unable to create internal signer: %v\n", err)
-		return nil, err
-	}
 	cc.contextSigner = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment

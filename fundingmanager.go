@@ -223,19 +223,7 @@ type fundingConfig struct {
 	// so that the channel creation process can be completed.
 	Notifier chainntnfs.ChainNotifier
 
-	// SignMessage signs an arbitrary message with a given public key. The
-	// actual digest signed is the double sha-256 of the message. In the
-	// case that the private key corresponding to the passed public key
-	// cannot be located, then an error is returned.
-	//
-	// TODO(roasbeef): should instead pass on this responsibility to a
-	// distinct sub-system?
-	SignMessage func(pubKey *btcec.PublicKey,
-		msg []byte) (input.Signature, error)
-
-	// The ContextSigner implementation.
-	// NOTE: This signer will subsume the SignMessage above when
-	// the ContextSigner implementation is complete.
+	// The ContextSigner is responsible for signing messages.
 	ContextSigner lnwallet.ContextSigner
 
 	// CurrentNodeAnnouncement should return the latest, fully signed node
@@ -2857,7 +2845,7 @@ func (f *fundingManager) newChanAnnouncement(localPubKey, remotePubKey,
 	if err != nil {
 		return nil, err
 	}
-	sig, err := f.cfg.SignMessage(f.cfg.IDKey, chanUpdateMsg)
+	sig, err := f.cfg.ContextSigner.SignChannelUpdate(chanUpdateMsg)
 	if err != nil {
 		return nil, errors.Errorf("unable to generate channel "+
 			"update announcement signature: %v", err)

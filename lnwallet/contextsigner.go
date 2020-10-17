@@ -31,6 +31,15 @@ type NodeContextSigner interface {
 
 	// Generate the node signature for the channel update.
 	SignChannelUpdate(dataToSign []byte) (input.Signature, error)
+
+	// Generate a signature for an invoice.
+	SignInvoice(
+		humanReadablePart string,
+		taggedFields []byte,
+	) ([]byte, []byte, error)
+
+	// Generate a signature for an ad-hoc message.
+	SignMessage(dataToSign []byte) ([]byte, error)
 }
 
 type ChannelContextSigner interface {

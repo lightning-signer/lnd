@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -16,37 +17,42 @@ import (
 )
 
 type InternalSigner struct {
-	signer        input.Signer
 	secretKeyRing keychain.SecretKeyRing
-	keyRing       keychain.KeyRing // separate for shimming
+	publicKeyRing keychain.KeyRing // separate for shimming
+	nodeKeyECDH   *keychain.PubKeyECDH
+	nodeSigner    *netann.NodeSigner
+	signer        input.Signer
 	signMessage   func(
 		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error)
-	idKeyDesc     keychain.KeyDescriptor
-	nodeKeyECDH   *keychain.PubKeyECDH
-	nodeKeySigner *keychain.PubKeyDigestSigner
-	nodeSigner    *netann.NodeSigner
 }
 
 func NewInternalSigner(
-	signer input.Signer,
 	keyRing keychain.SecretKeyRing,
+	signer input.Signer,
 	signMessage func(
 		pubKey *btcec.PublicKey, msg []byte) (input.Signature, error),
-) (*InternalSigner, error) {
+) *InternalSigner {
 	// We can't initialize the signers yet because the keyring is still
 	// locked. Record the arguments for later..
 	return &InternalSigner{
-		signer:        signer,
 		secretKeyRing: keyRing,
-		keyRing:       keyRing, // separate for shimming
+		publicKeyRing: keyRing, // separate for shimming
+		signer:        signer,
 		signMessage:   signMessage,
-	}, nil
+	}
+}
+
+// This constructor can be used in testing contexts where only
+// the lnwallet.MessageSigner subset of methods is needed (testing).
+func NewNodeSignerOnly(nodeSigner *netann.NodeSigner) *InternalSigner {
+	return &InternalSigner{
+		nodeSigner: nodeSigner,
+	}
 }
 
 func (is *InternalSigner) Initialize() error {
 	// Once the keyring is unlocked we can setup the signers.
-	var err error
-	is.idKeyDesc, err = is.keyRing.DeriveKey(
+	idKeyDesc, err := is.publicKeyRing.DeriveKey(
 		keychain.KeyLocator{
 			Family: keychain.KeyFamilyNodeKey,
 			Index:  0,
@@ -55,10 +61,10 @@ func (is *InternalSigner) Initialize() error {
 	if err != nil {
 		return err
 	}
-	is.nodeKeyECDH = keychain.NewPubKeyECDH(is.idKeyDesc, is.secretKeyRing)
-	is.nodeKeySigner = keychain.NewPubKeyDigestSigner(
-		is.idKeyDesc, is.secretKeyRing)
-	is.nodeSigner = netann.NewNodeSigner(is.nodeKeySigner)
+	is.nodeKeyECDH = keychain.NewPubKeyECDH(idKeyDesc, is.secretKeyRing)
+	is.nodeSigner = netann.NewNodeSigner(
+		keychain.NewPubKeyDigestSigner(idKeyDesc, is.secretKeyRing),
+	)
 	return nil
 }
 
@@ -72,17 +78,36 @@ func (is *InternalSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 
 func (is *InternalSigner) SignNodeAnnouncement(
 	dataToSign []byte) (input.Signature, error) {
-	return nil, fmt.Errorf("InternalSigner SignAnnouncement unimplemented")
+	return is.nodeSigner.SignMessage(is.PubKey(), dataToSign)
 }
 
 func (is *InternalSigner) SignChannelUpdate(
 	dataToSign []byte) (input.Signature, error) {
-	return nil, fmt.Errorf("InternalSigner SignChannelUpdate unimplemented")
+	return is.nodeSigner.SignMessage(is.PubKey(), dataToSign)
 }
 
-func (is *InternalSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
+func (is *InternalSigner) SignInvoice(
+	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
+
+	toSign := append([]byte(hrp), taggedFieldsBytes...)
+	hash := chainhash.HashB(toSign)
+
+	// We use compact signature format, and also encoded the recovery ID
+	// such that a reader of the invoice can recover our pubkey from the
+	// signature.
+	sign, err := is.nodeSigner.SignCompact(hash)
+
+	return hash, sign, err
+}
+
+func (is *InternalSigner) SignMessage(
+	dataToSign []byte) ([]byte, error) {
+	return is.nodeSigner.SignCompact(dataToSign)
+}
+
+func (is *InternalSigner) ShimKeyRing(publicKeyRing keychain.KeyRing) error {
 	// Replace the non-secret keyring w/ shimmed version.
-	is.keyRing = keyRing
+	is.publicKeyRing = publicKeyRing
 	return nil
 }
 
@@ -93,31 +118,31 @@ func (is *InternalSigner) NewChannel(
 	// Use the non-secret keyring, it may have been shimmed.
 	var err error
 	var bps lnwallet.ChannelBasepoints
-	bps.MultiSigKey, err = is.keyRing.DeriveNextKey(
+	bps.MultiSigKey, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyMultiSig,
 	)
 	if err != nil {
 		return nil, err
 	}
-	bps.RevocationBasePoint, err = is.keyRing.DeriveNextKey(
+	bps.RevocationBasePoint, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyRevocationBase,
 	)
 	if err != nil {
 		return nil, err
 	}
-	bps.HtlcBasePoint, err = is.keyRing.DeriveNextKey(
+	bps.HtlcBasePoint, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyHtlcBase,
 	)
 	if err != nil {
 		return nil, err
 	}
-	bps.PaymentBasePoint, err = is.keyRing.DeriveNextKey(
+	bps.PaymentBasePoint, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyPaymentBase,
 	)
 	if err != nil {
 		return nil, err
 	}
-	bps.DelayBasePoint, err = is.keyRing.DeriveNextKey(
+	bps.DelayBasePoint, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyDelayBase,
 	)
 	if err != nil {

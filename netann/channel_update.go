@@ -51,7 +51,7 @@ func ChanUpdSetTimestamp(update *lnwire.ChannelUpdate) {
 // monotonically increase from the prior.
 //
 // NOTE: This method modifies the given update.
-func SignChannelUpdate(signer lnwallet.MessageSigner, pubKey *btcec.PublicKey,
+func SignChannelUpdate(signer lnwallet.NodeContextSigner, pubKey *btcec.PublicKey,
 	update *lnwire.ChannelUpdate, mods ...ChannelUpdateModifier) error {
 
 	// Apply the requested changes to the channel update.
@@ -60,7 +60,11 @@ func SignChannelUpdate(signer lnwallet.MessageSigner, pubKey *btcec.PublicKey,
 	}
 
 	// Create the DER-encoded ECDSA signature over the message digest.
-	sig, err := SignAnnouncement(signer, pubKey, update)
+	dataToSign, err := update.DataToSign()
+	if err != nil {
+		return err
+	}
+	sig, err := signer.SignChannelUpdate(dataToSign)
 	if err != nil {
 		return err
 	}

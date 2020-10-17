@@ -144,9 +144,8 @@ type server struct {
 	// to authenticate any incoming connections.
 	identityECDH keychain.SingleKeyECDH
 
-	// nodeSigner is an implementation of the MessageSigner implementation
-	// that's backed by the identity private key of the running lnd node.
-	nodeSigner *netann.NodeSigner
+	// nodeSigner is an implementation of the NodeContextSigner.
+	nodeSigner lnwallet.NodeContextSigner
 
 	chanStatusMgr *netann.ChanStatusManager
 
@@ -345,11 +344,8 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 	torController *tor.Controller) (*server, error) {
 
 	var (
-		err           error
-		nodeKeyECDH   = cc.contextSigner
-		nodeKeySigner = keychain.NewPubKeyDigestSigner(
-			*nodeKeyDesc, cc.keyRing,
-		)
+		err         error
+		nodeKeyECDH = cc.contextSigner
 	)
 
 	listeners := make([]net.Listener, len(listenAddrs))
@@ -435,7 +431,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		channelNotifier: channelnotifier.New(remoteChanDB),
 
 		identityECDH: nodeKeyECDH,
-		nodeSigner:   netann.NewNodeSigner(nodeKeySigner),
+		nodeSigner:   cc.contextSigner,
 
 		listenAddrs: listenAddrs,
 
@@ -654,9 +650,11 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 
 	// With the announcement generated, we'll sign it to properly
 	// authenticate the message on the network.
-	authSig, err := netann.SignAnnouncement(
-		s.nodeSigner, s.identityECDH.PubKey(), nodeAnn,
-	)
+	dataToSign, err := nodeAnn.DataToSign()
+	if err != nil {
+		return nil, fmt.Errorf("trouble serializing node ann: %v", err)
+	}
+	authSig, err := s.nodeSigner.SignNodeAnnouncement(dataToSign)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate signature for "+
 			"self node announcement: %v", err)
@@ -993,17 +991,8 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		UpdateLabel: func(hash chainhash.Hash, label string) error {
 			return cc.wallet.LabelTransaction(hash, label, true)
 		},
-		Notifier:     cc.chainNotifier,
-		FeeEstimator: cc.feeEstimator,
-		SignMessage: func(pubKey *btcec.PublicKey,
-			msg []byte) (input.Signature, error) {
-
-			if pubKey.IsEqual(nodeKeyECDH.PubKey()) {
-				return s.nodeSigner.SignMessage(pubKey, msg)
-			}
-
-			return cc.msgSigner.SignMessage(pubKey, msg)
-		},
+		Notifier:      cc.chainNotifier,
+		FeeEstimator:  cc.feeEstimator,
 		ContextSigner: cc.contextSigner,
 		CurrentNodeAnnouncement: func() (lnwire.NodeAnnouncement, error) {
 			return s.genNodeAnnouncement(true)

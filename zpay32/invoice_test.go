@@ -100,17 +100,11 @@ var (
 		},
 	}
 
-	testMessageSigner = MessageSigner{
-		SignCompact: func(hash []byte) ([]byte, error) {
-			sig, err := btcec.SignCompact(btcec.S256(),
-				testPrivKey, hash, true)
-			if err != nil {
-				return nil, fmt.Errorf("can't sign the "+
-					"message: %v", err)
-			}
-			return sig, nil
-		},
-	}
+	testMessageSigner = internalsigner.NewNodeSignerOnly(
+		netann.NewNodeSigner(
+			&keychain.PrivKeyDigestSigner{PrivKey: testPrivKey},
+		),
+	)
 
 	emptyFeatures = lnwire.NewFeatureVector(nil, lnwire.Features)
 

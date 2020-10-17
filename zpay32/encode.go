@@ -5,15 +5,15 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bech32"
+	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
 // Encode takes the given MessageSigner and returns a string encoding this
 // invoice signed by the node key of the signer.
-func (invoice *Invoice) Encode(signer MessageSigner) (string, error) {
+func (invoice *Invoice) Encode(signer lnwallet.NodeContextSigner) (string, error) {
 	// First check that this invoice is valid before starting the encoding.
 	if err := validateInvoice(invoice); err != nil {
 		return "", err
@@ -69,13 +69,7 @@ func (invoice *Invoice) Encode(signer MessageSigner) (string, error) {
 		return "", err
 	}
 
-	toSign := append([]byte(hrp), taggedFieldsBytes...)
-	hash := chainhash.HashB(toSign)
-
-	// We use compact signature format, and also encoded the recovery ID
-	// such that a reader of the invoice can recover our pubkey from the
-	// signature.
-	sign, err := signer.SignCompact(hash)
+	hash, sign, err := signer.SignInvoice(hrp, taggedFieldsBytes)
 	if err != nil {
 		return "", err
 	}
