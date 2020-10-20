@@ -62,17 +62,10 @@ func (invoice *Invoice) Encode(signer lnwallet.NodeContextSigner) (string, error
 		hrp += am
 	}
 
-	// The signature is over the single SHA-256 hash of the hrp + the
-	// tagged fields encoded in base256.
-	taggedFieldsBytes, err := bech32.ConvertBits(bufferBase32.Bytes(), 5, 8, true)
-	if err != nil {
-		return "", err
-	}
-
 	// We use compact signature format, and also encoded the recovery ID
 	// such that a reader of the invoice can recover our pubkey from the
 	// signature.
-	hash, sign, err := signer.SignInvoice(hrp, taggedFieldsBytes)
+	hash, sign, err := signer.SignInvoice(hrp, bufferBase32.Bytes())
 	if err != nil {
 		return "", err
 	}

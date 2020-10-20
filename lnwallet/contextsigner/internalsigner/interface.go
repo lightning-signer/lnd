@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil/bech32"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -79,7 +80,13 @@ func (is *InternalSigner) SignChannelUpdate(
 }
 
 func (is *InternalSigner) SignInvoice(
-	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
+	hrp string, base32Bytes []byte) ([]byte, []byte, error) {
+	// The signature is over the single SHA-256 hash of the hrp + the
+	// tagged fields encoded in base256.
+	taggedFieldsBytes, err := bech32.ConvertBits(base32Bytes, 5, 8, true)
+	if err != nil {
+		return nil, nil, err
+	}
 	toSign := append([]byte(hrp), taggedFieldsBytes...)
 	hash := chainhash.HashB(toSign)
 	sign, err := is.nodeSigner.SignDigestCompact(hash)
