@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil/bech32"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -24,6 +26,7 @@ type RemoteSigner struct {
 	conn           *grpc.ClientConn
 	client         SignerClient
 	nodeID         []byte
+	pubKey         *btcec.PublicKey
 	basePointIndex uint32
 }
 
@@ -46,6 +49,131 @@ func NewRemoteSigner(
 		client:         NewSignerClient(conn),
 		basePointIndex: 0,
 	}, nil
+}
+
+func (rsi *RemoteSigner) PubKey() *btcec.PublicKey {
+	return rsi.pubKey
+}
+
+func (rsi *RemoteSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	if rsi.nodeID == nil {
+		return [32]byte{}, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.ECDH(ctx, &ECDHRequest{
+		NodeId: &NodeId{Data: rsi.nodeID},
+		Point:  &PubKey{Data: pubKey.SerializeCompressed()},
+	})
+	if err != nil {
+		// We need to log the error here because it seems callers don't
+		// get this error into the log.
+		log.Errorf("RemoteSigner.ECDH failed: %v", err)
+		return [32]byte{}, err
+	}
+
+	var secret [32]byte
+	copy(secret[:], rsp.SharedSecret.Data)
+	log.Debugf("ECDH response: secret=%s", hex.EncodeToString(secret[:]))
+	return secret, nil
+}
+
+func (rsi *RemoteSigner) SignNodeAnnouncement(
+	dataToSign []byte) (input.Signature, error) {
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.SignNodeAnnouncement(ctx,
+		&SignNodeAnnouncementRequest{
+			NodeId:           &NodeId{Data: rsi.nodeID[:]},
+			NodeAnnouncement: dataToSign,
+		})
+	if err != nil {
+		return nil, err
+	}
+	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
+}
+
+func (rsi *RemoteSigner) SignChannelUpdate(
+	dataToSign []byte) (input.Signature, error) {
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.SignChannelUpdate(ctx,
+		&SignChannelUpdateRequest{
+			NodeId:        &NodeId{Data: rsi.nodeID[:]},
+			ChannelUpdate: dataToSign,
+		})
+	if err != nil {
+		return nil, err
+	}
+	return btcec.ParseDERSignature(rsp.Signature.Data, btcec.S256())
+}
+
+func (rsi *RemoteSigner) SignInvoice(
+	hrp string, base32Bytes []byte) ([]byte, []byte, error) {
+	if rsi.nodeID == nil {
+		return nil, nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	// The signature is over the single SHA-256 hash of the hrp + the
+	// tagged fields encoded in base256.
+	taggedFieldsBytes, err := bech32.ConvertBits(base32Bytes, 5, 8, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	toSign := append([]byte(hrp), taggedFieldsBytes...)
+	hash := chainhash.HashB(toSign)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.SignInvoice(ctx,
+		&SignInvoiceRequest{
+			NodeId:            &NodeId{Data: rsi.nodeID[:]},
+			DataPart:          base32Bytes,
+			HumanReadablePart: hrp,
+		})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Convert the format of the recoverable signature.
+	sig := rsp.Signature.Data
+	recoveryID := sig[len(sig)-1]
+	hdrval := recoveryID + 27 + 4
+	sign := append([]byte{hdrval}, sig[:len(sig)-1]...)
+
+	return hash, sign, nil
+}
+
+func (rsi *RemoteSigner) SignMessage(
+	dataToSign []byte) ([]byte, error) {
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	rsp, err := rsi.client.SignMessage(ctx,
+		&SignMessageRequest{
+			NodeId:  &NodeId{Data: rsi.nodeID[:]},
+			Message: dataToSign,
+		})
+	if err != nil {
+		return nil, err
+	}
+	return rsp.Signature.Data, nil
 }
 
 func (rsi *RemoteSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
@@ -86,11 +214,17 @@ func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
 	rsi.nodeID = rsp.NodeId.Data
 	log.Infof("InitNode: nodeID: %s", hex.EncodeToString(rsi.nodeID))
 
+	rsi.pubKey, err = btcec.ParsePubKey(rsi.nodeID, btcec.S256())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // SetNodeID is called when an existing wallet is reopened.
 func (rsi *RemoteSigner) SetNodeID(pubkey *btcec.PublicKey) {
+	rsi.pubKey = pubkey
 	rsi.nodeID = pubkey.SerializeCompressed()
 	log.Infof("SetNodeID: %s", hex.EncodeToString(rsi.nodeID))
 }

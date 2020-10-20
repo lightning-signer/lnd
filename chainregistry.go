@@ -538,7 +538,7 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 	// the results.  In production, only one of the InternalSigner or
 	// a RemoteSigner will be instantiated and it will be used
 	// directly.
-	internalSigner, err := internalsigner.NewInternalSigner(
+	internalSigner := internalsigner.NewInternalSigner(
 		keyRing,
 		wc,
 		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {

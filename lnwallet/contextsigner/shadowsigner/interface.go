@@ -18,14 +18,14 @@ import (
 )
 
 // TEMPORARY - The ShadowSigner is used to validate the remotesigner
-// during development.  The ShadowSigner is a ChannelContextSigner
-// which contains an internal ChannelContextSigner and a remote
-// ChannelContextSigner. It delegates all calls to both of the other
+// during development.  The ShadowSigner is a ContextSigner
+// which contains an internal ContextSigner and a remote
+// ContextSigner. It delegates all calls to both of the other
 // signers and compares the results.
 
 type shadowSigner struct {
-	internalSigner lnwallet.ChannelContextSigner
-	remoteSigner   lnwallet.ChannelContextSigner
+	internalSigner lnwallet.ContextSigner
+	remoteSigner   lnwallet.ContextSigner
 }
 
 // We need to capture the same seed that the internal wallet uses for
@@ -63,13 +63,117 @@ func GetShadowSeed() []byte {
 }
 
 func NewShadowSigner(
-	internalSigner lnwallet.ChannelContextSigner,
-	remoteSigner lnwallet.ChannelContextSigner,
-) lnwallet.ChannelContextSigner {
+	internalSigner lnwallet.ContextSigner,
+	remoteSigner lnwallet.ContextSigner,
+) lnwallet.ContextSigner {
 	return &shadowSigner{
 		internalSigner: internalSigner,
 		remoteSigner:   remoteSigner,
 	}
+}
+
+func (ss *shadowSigner) PubKey() *btcec.PublicKey {
+	pubkey0 := ss.internalSigner.PubKey()
+	pubkey1 := ss.remoteSigner.PubKey()
+	if !reflect.DeepEqual(pubkey0, pubkey1) {
+		panic(fmt.Sprintf("ShadowSigner.PubKey mismatch: %v != %v",
+			pubkey0, pubkey1))
+	}
+	return pubkey1
+}
+
+func (ss *shadowSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
+	ecdh0, err := ss.internalSigner.ECDH(pubKey)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	ecdh1, err := ss.remoteSigner.ECDH(pubKey)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if ecdh0 != ecdh1 {
+		return [32]byte{}, fmt.Errorf("ShadowSigner.ECDH mismatch: %s != %s",
+			hex.EncodeToString(ecdh0[:]), hex.EncodeToString(ecdh1[:]))
+	}
+	return ecdh1, nil
+}
+
+func (ss *shadowSigner) SignNodeAnnouncement(
+	dataToSign []byte) (input.Signature, error) {
+	sig0, err := ss.internalSigner.SignNodeAnnouncement(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignNodeAnnouncement(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignNodeAnnouncement mismatch: "+
+			"internal=%v remote=%v", sig0, sig1)
+	}
+	return sig1, nil
+}
+
+func (ss *shadowSigner) SignChannelUpdate(
+	dataToSign []byte) (input.Signature, error) {
+	sig0, err := ss.internalSigner.SignChannelUpdate(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignChannelUpdate(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignChannelUpdate mismatch: "+
+			"internal=%v remote=%v", sig0, sig1)
+	}
+	return sig1, nil
+}
+
+func (ss *shadowSigner) SignInvoice(
+	hrp string, base32Bytes []byte) ([]byte, []byte, error) {
+	hash0, sig0, err := ss.internalSigner.SignInvoice(hrp, base32Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	hash1, sig1, err := ss.remoteSigner.SignInvoice(hrp, base32Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !bytes.Equal(hash0, hash1) {
+		return nil, nil, fmt.Errorf("ShadowSigner.SignInvoice hash mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(hash0),
+			hex.EncodeToString(hash1))
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, nil, fmt.Errorf("ShadowSigner.SignInvoice mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(sig0),
+			hex.EncodeToString(sig1))
+	}
+	return hash1, sig1, nil
+}
+
+func (ss *shadowSigner) SignMessage(
+	dataToSign []byte) ([]byte, error) {
+	sig0, err := ss.internalSigner.SignMessage(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignMessage(dataToSign)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignMessage mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(sig0),
+			hex.EncodeToString(sig1))
+	}
+	return sig1, nil
 }
 
 func (ss *shadowSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
@@ -276,4 +380,4 @@ func logBasepoints(pfx string, bps *lnwallet.ChannelBasepoints) {
 
 // Compile time check to make sure shadowSigner implements the
 // requisite interfaces.
-var _ lnwallet.ChannelContextSigner = (*shadowSigner)(nil)
+var _ lnwallet.ContextSigner = (*shadowSigner)(nil)
