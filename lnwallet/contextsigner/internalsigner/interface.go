@@ -80,10 +80,10 @@ func (is *InternalSigner) SignChannelUpdate(
 }
 
 func (is *InternalSigner) SignInvoice(
-	hrp string, base32Bytes []byte) ([]byte, []byte, error) {
+	hrp string, fieldsData []byte) ([]byte, []byte, error) {
 	// The signature is over the single SHA-256 hash of the hrp + the
 	// tagged fields encoded in base256.
-	taggedFieldsBytes, err := bech32.ConvertBits(base32Bytes, 5, 8, true)
+	taggedFieldsBytes, err := bech32.ConvertBits(fieldsData, 5, 8, true)
 	if err != nil {
 		return nil, nil, err
 	}

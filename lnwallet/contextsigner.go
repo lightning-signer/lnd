@@ -35,7 +35,7 @@ type NodeContextSigner interface {
 	// Generate a signature for an invoice.
 	SignInvoice(
 		humanReadablePart string,
-		taggedFields []byte,
+		fieldsData []byte,
 	) ([]byte, []byte, error)
 
 	// Generate a signature for an ad-hoc message.
