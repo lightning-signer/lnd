@@ -8,19 +8,19 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 )
 
-type MockInvoiceSigner struct {
+type TestInvoiceSigner struct {
 	privKey *btcec.PrivateKey
 }
 
-func NewMockInvoiceSigner(
-	privKey *btcec.PrivateKey) *MockInvoiceSigner {
-	return &MockInvoiceSigner{
+func NewTestInvoiceSigner(
+	privKey *btcec.PrivateKey) *TestInvoiceSigner {
+	return &TestInvoiceSigner{
 		privKey: privKey,
 	}
 }
 
 // Generate a signature for an invoice.
-func (is *MockInvoiceSigner) SignInvoice(
+func (is *TestInvoiceSigner) SignInvoice(
 	humanReadablePart string,
 	fieldsData []byte,
 ) ([]byte, []byte, error) {

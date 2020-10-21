@@ -158,6 +158,6 @@ func getPayReq(net *bitcoinCfg.Params) (string, error) {
 	}
 
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), testPrivKeyBytes)
-	testInvoiceSigner := zpay32.NewMockInvoiceSigner(privKey)
+	testInvoiceSigner := zpay32.NewTestInvoiceSigner(privKey)
 	return payReq.Encode(testInvoiceSigner)
 }

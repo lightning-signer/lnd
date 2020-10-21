@@ -100,7 +100,7 @@ var (
 		},
 	}
 
-	testMessageSigner = NewMockInvoiceSigner(testPrivKey)
+	testMessageSigner = NewTestInvoiceSigner(testPrivKey)
 
 	emptyFeatures = lnwire.NewFeatureVector(nil, lnwire.Features)
 
@@ -904,7 +904,7 @@ func TestInvoiceChecksumMalleability(t *testing.T) {
 	ts := time.Unix(0, 0)
 
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
-	msgSigner := NewMockInvoiceSigner(privKey)
+	msgSigner := NewTestInvoiceSigner(privKey)
 
 	opts := []func(*Invoice){Description("test")}
 	invoice, err := NewInvoice(chain, payHash, ts, opts...)
