@@ -714,11 +714,7 @@ func TestDecodeEncode(t *testing.T) {
 		}
 
 		if decodedInvoice != nil {
-			reencoded, err := decodedInvoice.Encode(
-				func(hrp string, fieldsData []byte) ([]byte, []byte, error) {
-					return testMessageSigner.SignInvoice(hrp, fieldsData)
-				},
-			)
+			reencoded, err := decodedInvoice.Encode(testMessageSigner)
 			if (err == nil) != test.valid {
 				t.Errorf("Encoding test %d failed: %v", i, err)
 				return
@@ -848,11 +844,7 @@ func TestNewInvoice(t *testing.T) {
 		if err != nil && !test.valid {
 			continue
 		}
-		encoded, err := invoice.Encode(
-			func(hrp string, fieldsData []byte) ([]byte, []byte, error) {
-				return testMessageSigner.SignInvoice(hrp, fieldsData)
-			},
-		)
+		encoded, err := invoice.Encode(testMessageSigner)
 		if (err == nil) != test.valid {
 			t.Errorf("NewInvoice test %d failed: %v", i, err)
 			return
@@ -918,11 +910,7 @@ func TestInvoiceChecksumMalleability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoded, err := invoice.Encode(
-		func(hrp string, fieldsData []byte) ([]byte, []byte, error) {
-			return msgSigner.SignInvoice(hrp, fieldsData)
-		},
-	)
+	encoded, err := invoice.Encode(msgSigner)
 	if err != nil {
 		t.Fatal(err)
 	}
