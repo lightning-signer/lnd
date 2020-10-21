@@ -17,7 +17,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/lnwire"
 
 	litecoinCfg "github.com/ltcsuite/ltcd/chaincfg"
@@ -101,7 +100,7 @@ var (
 		},
 	}
 
-	testMessageSigner = mock.NewSingleNodeContextSigner(testPrivKey)
+	testMessageSigner = NewMockInvoiceSigner(testPrivKey)
 
 	emptyFeatures = lnwire.NewFeatureVector(nil, lnwire.Features)
 
@@ -905,7 +904,7 @@ func TestInvoiceChecksumMalleability(t *testing.T) {
 	ts := time.Unix(0, 0)
 
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
-	msgSigner := mock.NewSingleNodeContextSigner(privKey)
+	msgSigner := NewMockInvoiceSigner(privKey)
 
 	opts := []func(*Invoice){Description("test")}
 	invoice, err := NewInvoice(chain, payHash, ts, opts...)

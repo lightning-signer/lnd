@@ -8,6 +8,7 @@ import (
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
 type ContextSigner interface {
@@ -33,10 +34,7 @@ type NodeContextSigner interface {
 	SignChannelUpdate(dataToSign []byte) (input.Signature, error)
 
 	// Generate a signature for an invoice.
-	SignInvoice(
-		humanReadablePart string,
-		fieldsData []byte,
-	) ([]byte, []byte, error)
+	zpay32.InvoiceSigner
 
 	// Generate a signature for an ad-hoc message.
 	SignMessage(dataToSign []byte) ([]byte, error)

@@ -7,13 +7,20 @@ import (
 
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bech32"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
+type InvoiceSigner interface {
+	// Generate a signature for an invoice.
+	SignInvoice(
+		humanReadablePart string,
+		fieldsData []byte,
+	) ([]byte, []byte, error)
+}
+
 // Encode takes the given MessageSigner and returns a string encoding this
 // invoice signed by the node key of the signer.
-func (invoice *Invoice) Encode(signer lnwallet.NodeContextSigner) (string, error) {
+func (invoice *Invoice) Encode(signer InvoiceSigner) (string, error) {
 	// First check that this invoice is valid before starting the encoding.
 	if err := validateInvoice(invoice); err != nil {
 		return "", err

@@ -2,14 +2,12 @@ package migration_01_to_11
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
 	bitcoinCfg "github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
-	"github.com/lightningnetwork/lnd/lntest/mock"
 	"github.com/lightningnetwork/lnd/zpay32"
 	litecoinCfg "github.com/ltcsuite/ltcd/chaincfg"
 )
@@ -160,5 +158,6 @@ func getPayReq(net *bitcoinCfg.Params) (string, error) {
 	}
 
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), testPrivKeyBytes)
-	return payReq.Encode(NewSingleNodeContextSigner(privKey))
+	testInvoiceSigner := zpay32.NewMockInvoiceSigner(privKey)
+	return payReq.Encode(testInvoiceSigner)
 }
