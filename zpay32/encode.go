@@ -72,7 +72,7 @@ func (invoice *Invoice) Encode(signer InvoiceSigner) (string, error) {
 	// We use compact signature format, and also encoded the recovery ID
 	// such that a reader of the invoice can recover our pubkey from the
 	// signature.
-	hash, sign, err := signer.SignInvoice(hrp, bufferBase32.Bytes())
+	hash, sign, err := signInvoiceData(hrp, bufferBase32.Bytes())
 	if err != nil {
 		return "", err
 	}

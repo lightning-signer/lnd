@@ -7,6 +7,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	bitcoinCfg "github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcutil/bech32"
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
 	"github.com/lightningnetwork/lnd/zpay32"
 	litecoinCfg "github.com/ltcsuite/ltcd/chaincfg"
@@ -141,6 +143,31 @@ func TestMigrateInvoicesHodl(t *testing.T) {
 		func(d *DB) {},
 		MigrateInvoices,
 		true)
+}
+
+func signInvoice(hrp string, fieldsData []byte) ([]byte, []byte, error) {
+	// The signature is over the single SHA-256 hash of the hrp + the
+	// tagged fields encoded in base256.
+	taggedFieldsBytes, err := bech32.ConvertBits(fieldsData, 5, 8, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	toSign := append([]byte(hrp), taggedFieldsBytes...)
+	hash := chainhash.HashB(toSign)
+
+	// Should the signature reference a compressed public key or not.
+	isCompressedKey := true
+
+	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), testPrivKeyBytes)
+
+	// btcec.SignCompact returns a pubkey-recoverable signature
+	sign, err := btcec.SignCompact(
+		btcec.S256(), privKey, hash, isCompressedKey,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("can't sign the hash: %v", err)
+	}
+	return hash, sign, nil
 }
 
 // getPayReq creates a payment request for the given net.

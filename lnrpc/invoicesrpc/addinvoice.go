@@ -288,7 +288,11 @@ func AddInvoice(ctx context.Context, cfg *AddInvoiceConfig,
 		return nil, nil, err
 	}
 
-	payReqString, err := payReq.Encode(cfg.NodeSigner)
+	payReqString, err := payReq.Encode(
+		func(hrp string, fieldsData []byte) ([]byte, []byte, error) {
+			return cfg.NodeSigner.SignInvoice(hrp, fieldsData)
+		},
+	)
 	if err != nil {
 		return nil, nil, err
 	}

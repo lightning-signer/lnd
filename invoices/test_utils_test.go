@@ -210,8 +210,11 @@ func newTestInvoice(t *testing.T, preimage lntypes.Preimage,
 		t.Fatalf("Error while creating new invoice: %v", err)
 	}
 
-	paymentRequest, err := rawInvoice.Encode(testMessageSigner)
-
+	paymentRequest, err := rawInvoice.Encode(
+		func(hrp string, fieldsData []byte) ([]byte, []byte, error) {
+			return testMessageSigner.SignInvoice(hrp, fieldsData)
+		},
+	)
 	if err != nil {
 		t.Fatalf("Error while encoding payment request: %v", err)
 	}

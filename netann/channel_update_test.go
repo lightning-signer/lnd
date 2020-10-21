@@ -37,7 +37,7 @@ func (ms *mockSigner) SignChannelUpdate(
 }
 
 func (ms *mockSigner) SignInvoice(
-	hrp string, taggedFieldsBytes []byte) ([]byte, []byte, error) {
+	hrp string, fieldsData []byte) ([]byte, []byte, error) {
 	return nil, nil, ms.err
 }
 
