@@ -148,12 +148,7 @@ func (rsi *RemoteSigner) SignInvoice(
 	}
 
 	// Convert the format of the recoverable signature.
-	sig := rsp.Signature.Data
-	recoveryID := sig[len(sig)-1]
-	hdrval := recoveryID + 27 + 4
-	sign := append([]byte{hdrval}, sig[:len(sig)-1]...)
-
-	return hash, sign, nil
+	return hash, convertRecoverableSignatureFormat(rsp.Signature.Data), nil
 }
 
 func (rsi *RemoteSigner) SignMessage(
@@ -165,15 +160,21 @@ func (rsi *RemoteSigner) SignMessage(
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	// The remotesigner will prefix the data with the standard prefix
+	// ("Lightning Signed Message") itself, so remove when we pass.
+	dataWithoutPrefix := dataToSign[25:]
+
 	rsp, err := rsi.client.SignMessage(ctx,
 		&SignMessageRequest{
 			NodeId:  &NodeId{Data: rsi.nodeID[:]},
-			Message: dataToSign,
+			Message: dataWithoutPrefix,
 		})
 	if err != nil {
 		return nil, err
 	}
-	return rsp.Signature.Data, nil
+
+	// Convert the format of the recoverable signature.
+	return convertRecoverableSignatureFormat(rsp.Signature.Data), nil
 }
 
 func (rsi *RemoteSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
@@ -663,6 +664,16 @@ func generateRemoteCommitmentWitnessScripts(
 		witscripts = append(witscripts, witscriptMap[s2a(txi.PkScript)])
 	}
 	return witscripts, nil
+}
+
+// The remotesigner uses <R><S><recovery-id>, lnd uses <(byte of
+// 27+public key solution)+4 if compressed >< padded bytes for
+// signature R><padded bytes for signature S> as descibed in
+// btcec.SignCompact source..
+func convertRecoverableSignatureFormat(insig []byte) []byte {
+	recoveryID := insig[len(insig)-1]
+	hdrval := recoveryID + 27 + 4
+	return append([]byte{hdrval}, insig[:len(insig)-1]...)
 }
 
 // A compile time check to ensure that RemoteSigner implements the
