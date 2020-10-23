@@ -218,7 +218,7 @@ func CreateTestChannels(chanType channeldb.ChannelType) (
 	}
 	aliceCommitPoint := input.ComputeCommitmentPoint(aliceFirstRevoke[:])
 
-	aliceCommitTx, bobCommitTx, err := CreateCommitmentTxns(
+	aliceCommitTx, _, bobCommitTx, _, err := CreateCommitmentTxns(
 		channelBal, channelBal, &aliceCfg, &bobCfg, aliceCommitPoint,
 		bobCommitPoint, *fundingTxIn, chanType,
 	)

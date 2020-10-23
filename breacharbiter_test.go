@@ -1799,7 +1799,7 @@ func createInitChannels(revocationWindow int) (*lnwallet.LightningChannel, *lnwa
 	}
 	aliceCommitPoint := input.ComputeCommitmentPoint(aliceFirstRevoke[:])
 
-	aliceCommitTx, bobCommitTx, err := lnwallet.CreateCommitmentTxns(
+	aliceCommitTx, _, bobCommitTx, _, err := lnwallet.CreateCommitmentTxns(
 		channelBal, channelBal, &aliceCfg, &bobCfg, aliceCommitPoint,
 		bobCommitPoint, *fundingTxIn, channeldb.SingleFunderTweaklessBit,
 	)

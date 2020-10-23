@@ -897,7 +897,7 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 	ourChanCfg, theirChanCfg *channeldb.ChannelConfig,
 	localCommitPoint, remoteCommitPoint *btcec.PublicKey,
 	fundingTxIn wire.TxIn, chanType channeldb.ChannelType) (
-	*wire.MsgTx, *wire.MsgTx, error) {
+	*wire.MsgTx, [][]byte, *wire.MsgTx, [][]byte, error) {
 
 	localCommitmentKeys := DeriveCommitmentKeys(
 		localCommitPoint, true, chanType, ourChanCfg, theirChanCfg,
@@ -906,33 +906,33 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 		remoteCommitPoint, false, chanType, ourChanCfg, theirChanCfg,
 	)
 
-	ourCommitTx, err := CreateCommitTx(
+	ourCommitTx, ourWitscripts, err := CreateCommitTx(
 		chanType, fundingTxIn, localCommitmentKeys, ourChanCfg,
 		theirChanCfg, localBalance, remoteBalance, 0,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	otxn := btcutil.NewTx(ourCommitTx)
 	if err := blockchain.CheckTransactionSanity(otxn); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	theirCommitTx, err := CreateCommitTx(
+	theirCommitTx, theirWitscripts, err := CreateCommitTx(
 		chanType, fundingTxIn, remoteCommitmentKeys, theirChanCfg,
 		ourChanCfg, remoteBalance, localBalance, 0,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	ttxn := btcutil.NewTx(theirCommitTx)
 	if err := blockchain.CheckTransactionSanity(ttxn); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return ourCommitTx, theirCommitTx, nil
+	return ourCommitTx, ourWitscripts, theirCommitTx, theirWitscripts, nil
 }
 
 // handleContributionMsg processes the second workflow step for the lifetime of
@@ -1178,7 +1178,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	// With the funding tx complete, create both commitment transactions.
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
-	ourCommitTx, theirCommitTx, err := CreateCommitmentTxns(
+	ourCommitTx, _, theirCommitTx, _, err := CreateCommitmentTxns(
 		localBalance, remoteBalance, ourContribution.ChannelConfig,
 		theirContribution.ChannelConfig,
 		ourContribution.FirstCommitmentPoint,
@@ -1543,7 +1543,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	// remote node's commitment transactions.
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
-	ourCommitTx, theirCommitTx, err := CreateCommitmentTxns(
+	ourCommitTx, _, theirCommitTx, _, err := CreateCommitmentTxns(
 		localBalance, remoteBalance,
 		pendingReservation.ourContribution.ChannelConfig,
 		pendingReservation.theirContribution.ChannelConfig,

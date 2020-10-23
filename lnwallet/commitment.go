@@ -465,14 +465,14 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	// a new commitment transaction with all the latest unsettled/un-timed
 	// out HTLCs.
 	if isOurs {
-		commitTx, err = CreateCommitTx(
+		commitTx, _, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.LocalChanCfg, &cb.chanState.RemoteChanCfg,
 			ourBalance.ToSatoshis(), theirBalance.ToSatoshis(),
 			numHTLCs,
 		)
 	} else {
-		commitTx, err = CreateCommitTx(
+		commitTx, _, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.RemoteChanCfg, &cb.chanState.LocalChanCfg,
 			theirBalance.ToSatoshis(), ourBalance.ToSatoshis(),
@@ -580,7 +580,18 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 	fundingOutput wire.TxIn, keyRing *CommitmentKeyRing,
 	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
 	amountToLocal, amountToRemote btcutil.Amount,
-	numHTLCs int64) (*wire.MsgTx, error) {
+	numHTLCs int64) (*wire.MsgTx, [][]byte, error) {
+
+	// We need to return the witscripts, ordered to match the
+	// outputs.  We'll match them after the output sort by pk_hash.
+	witscriptMap := make(map[[32]byte][]byte)
+
+	// A Slice to byte array helper so we can use a map.
+	s2a := func(slice []byte) [32]byte {
+		var hash [32]byte
+		copy(hash[:], slice)
+		return hash
+	}
 
 	// First, we create the script for the delayed "pay-to-self" output.
 	// This output has 2 main redemption clauses: either we can redeem the
@@ -592,13 +603,13 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 		keyRing.RevocationKey,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	toLocalScriptHash, err := input.WitnessScriptHash(
 		toLocalRedeemScript,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Next, we create the script paying to the remote.
@@ -606,7 +617,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 		chanType, keyRing.ToRemoteKey,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Now that both output scripts have been created, we can finally create
@@ -622,6 +633,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 			PkScript: toLocalScriptHash,
 			Value:    int64(amountToLocal),
 		})
+		witscriptMap[s2a(toLocalScriptHash)] = toLocalRedeemScript
 	}
 
 	remoteOutput := amountToRemote >= localChanCfg.DustLimit
@@ -630,6 +642,8 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 			PkScript: toRemoteScript.PkScript,
 			Value:    int64(amountToRemote),
 		})
+		witscriptMap[s2a(toRemoteScript.PkScript)] =
+			toRemoteScript.WitnessScript
 	}
 
 	// If this channel type has anchors, we'll also add those.
@@ -638,7 +652,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 			localChanCfg, remoteChanCfg,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Add local anchor output only if we have a commitment output
@@ -648,8 +662,8 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 				PkScript: localAnchor.PkScript,
 				Value:    int64(anchorSize),
 			})
+			witscriptMap[s2a(localAnchor.PkScript)] = localAnchor.WitnessScript
 		}
-
 		// Add anchor output to remote only if they have a commitment
 		// output or there are HTLCs.
 		if remoteOutput || numHTLCs > 0 {
@@ -657,10 +671,19 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 				PkScript: remoteAnchor.PkScript,
 				Value:    int64(anchorSize),
 			})
+			witscriptMap[s2a(remoteAnchor.PkScript)] =
+				remoteAnchor.WitnessScript
 		}
 	}
 
-	return commitTx, nil
+	// Scan the transaction, return the witness script for the
+	// matching outputs and []byte{} placeholders for the others.
+	var witscripts [][]byte
+	for _, txi := range commitTx.TxOut {
+		witscripts = append(witscripts, witscriptMap[s2a(txi.PkScript)])
+	}
+
+	return commitTx, witscripts, nil
 }
 
 // CoopCloseBalance returns the final balances that should be used to create

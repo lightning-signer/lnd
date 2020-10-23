@@ -568,7 +568,7 @@ func testSpendValidation(t *testing.T, tweakless bool) {
 		RevocationKey: revokePubKey,
 		ToRemoteKey:   bobPayKey,
 	}
-	commitmentTx, err := CreateCommitTx(
+	commitmentTx, _, err := CreateCommitTx(
 		channelType, *fakeFundingTxIn, keyRing, aliceChanCfg,
 		bobChanCfg, channelBalance, channelBalance, 0,
 	)
@@ -883,7 +883,7 @@ func createTestChannelsForVectors(tc *testContext, chanType channeldb.ChannelTyp
 		anchorAmt = 2 * anchorSize
 	}
 
-	remoteCommitTx, localCommitTx, err := CreateCommitmentTxns(
+	remoteCommitTx, _, localCommitTx, _, err := CreateCommitmentTxns(
 		remoteBalance, localBalance-commitFee,
 		&remoteCfg, &localCfg, remoteCommitPoint,
 		localCommitPoint, *fundingTxIn, chanType,
