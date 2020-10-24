@@ -1150,7 +1150,8 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType,
+		pstate.ChanType.HasAnchors(),
+		pstate.ChanType.IsTweakless(),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("ContextSigner.ReadyChannel failed: %v", err)
@@ -1544,7 +1545,8 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		theirs.MultiSigKey.PubKey,
 		theirs.CsvDelay,
 		pstate.RemoteShutdownScript,
-		pstate.ChanType,
+		pstate.ChanType.HasAnchors(),
+		pstate.ChanType.IsTweakless(),
 	)
 	if err != nil {
 		req.err <- fmt.Errorf("ContextSigner.ReadyChannel failed: %v", err)

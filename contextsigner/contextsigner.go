@@ -3,7 +3,6 @@ package contextsigner
 import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwire"
@@ -67,7 +66,8 @@ type ChannelContextSigner interface {
 		remoteFundingPubkey *btcec.PublicKey,
 		remoteToSelfDelay uint16,
 		remoteShutdownScript []byte,
-		chanType channeldb.ChannelType,
+		hasAnchors bool,
+		isTweakless bool,
 	) error
 
 	// Generate our signature for the peer's commitment transaction.

@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bech32"
-	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -159,7 +158,8 @@ func (is *InternalSigner) ReadyChannel(
 	remoteFundingPubkey *btcec.PublicKey,
 	remoteToSelfDelay uint16,
 	remoteShutdownScript []byte,
-	chanType channeldb.ChannelType,
+	hasAnchors bool,
+	isTweakless bool,
 ) error {
 	// The internal signer doesn't need this call, but validating
 	// signers using the ChannelContextSigner interface will.
