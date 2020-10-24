@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -247,7 +246,8 @@ func (ss *shadowSigner) ReadyChannel(
 	remoteFundingPubkey *btcec.PublicKey,
 	remoteToSelfDelay uint16,
 	remoteShutdownScript []byte,
-	chanType channeldb.ChannelType,
+	hasAnchors bool,
+	isTweakless bool,
 ) error {
 	var err error
 	err = ss.internalSigner.ReadyChannel(
@@ -266,7 +266,8 @@ func (ss *shadowSigner) ReadyChannel(
 		remoteFundingPubkey,
 		remoteToSelfDelay,
 		remoteShutdownScript,
-		chanType,
+		hasAnchors,
+		isTweakless,
 	)
 	if err != nil {
 		return err
@@ -287,7 +288,8 @@ func (ss *shadowSigner) ReadyChannel(
 		remoteFundingPubkey,
 		remoteToSelfDelay,
 		remoteShutdownScript,
-		chanType,
+		hasAnchors,
+		isTweakless,
 	)
 	if err != nil {
 		return err

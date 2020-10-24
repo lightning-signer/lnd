@@ -371,37 +371,9 @@ func (rsi *RemoteSigner) ReadyChannel(
 	remoteFundingPubkey *btcec.PublicKey,
 	remoteToSelfDelay uint16,
 	remoteShutdownScript []byte,
-	chanType channeldb.ChannelType,
+	hasAnchors bool,
+	isTweakless bool,
 ) error {
-	log.Debugf("ReadyChannel request: "+
-		"nodeID=%s, "+
-		"peerNodeID=%s, pendingChanID=%s, "+
-		"isOutbound=%v, channelValueSat=%v, "+
-		"pushValueMsat=%v, fundingOutpoint=%v, "+
-		"localToSelfDelay=%v, localShutdownScript=%s, "+
-		"remoteRevocationBasepoint=%s, "+
-		"remotePaymentBasepoint=%s, "+
-		"remoteHtlcBasepoint=%s, "+
-		"remoteDelayedPaymentBasepoint=%s, "+
-		"remoteFundingPubkey=%s, "+
-		"remoteToSelfDelay=%v, "+
-		"remoteShutdownScript=%s, "+
-		"chanType=%v",
-		hex.EncodeToString(rsi.nodeID[:]),
-		hex.EncodeToString(peerNode.SerializeCompressed()),
-		hex.EncodeToString(pendingChanID[:]),
-		isOutbound, channelValueSat,
-		pushValueMsat, fundingOutpoint,
-		localToSelfDelay, hex.EncodeToString(localShutdownScript),
-		hex.EncodeToString(remoteRevocationBasepoint.SerializeCompressed()),
-		hex.EncodeToString(remotePaymentBasepoint.SerializeCompressed()),
-		hex.EncodeToString(remoteHtlcBasepoint.SerializeCompressed()),
-		hex.EncodeToString(remoteDelayedPaymentBasepoint.SerializeCompressed()),
-		hex.EncodeToString(remoteFundingPubkey.SerializeCompressed()),
-		remoteToSelfDelay,
-		hex.EncodeToString(remoteShutdownScript),
-		chanType)
-
 	if rsi.nodeID == nil {
 		return fmt.Errorf("remotesigner nodeID not set")
 	}
@@ -410,9 +382,9 @@ func (rsi *RemoteSigner) ReadyChannel(
 	chanID := lnwire.NewChanIDFromOutPoint(fundingOutpoint)
 
 	var commitmentType ReadyChannelRequest_CommitmentType
-	if chanType.HasAnchors() {
+	if hasAnchors {
 		commitmentType = ReadyChannelRequest_ANCHORS
-	} else if chanType.IsTweakless() {
+	} else if isTweakless {
 		commitmentType = ReadyChannelRequest_STATIC_REMOTEKEY
 	} else {
 		commitmentType = ReadyChannelRequest_LEGACY
