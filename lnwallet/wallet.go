@@ -897,7 +897,7 @@ func CreateCommitmentTxns(localBalance, remoteBalance btcutil.Amount,
 	ourChanCfg, theirChanCfg *channeldb.ChannelConfig,
 	localCommitPoint, remoteCommitPoint *btcec.PublicKey,
 	fundingTxIn wire.TxIn, chanType channeldb.ChannelType) (
-	*wire.MsgTx, [][]byte, *wire.MsgTx, [][]byte, error) {
+	*wire.MsgTx, map[[32]byte][]byte, *wire.MsgTx, map[[32]byte][]byte, error) {
 
 	localCommitmentKeys := DeriveCommitmentKeys(
 		localCommitPoint, true, chanType, ourChanCfg, theirChanCfg,
@@ -1178,7 +1178,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	// With the funding tx complete, create both commitment transactions.
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
-	ourCommitTx, _, theirCommitTx, _, err := CreateCommitmentTxns(
+	ourCommitTx, _, theirCommitTx, theirWitscriptMap, err := CreateCommitmentTxns(
 		localBalance, remoteBalance, ourContribution.ChannelConfig,
 		theirContribution.ChannelConfig,
 		ourContribution.FirstCommitmentPoint,
@@ -1237,12 +1237,25 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	chanState.LocalCommitment.CommitTx = ourCommitTx
 	chanState.RemoteCommitment.CommitTx = theirCommitTx
 
+	// Next, we'll obtain the funding witness script, and the funding
+	// output itself so we can generate a valid signature for the remote
+	// party.
+	fundingIntent := pendingReservation.fundingIntent
+	fundingWitnessScript, fundingOutput, err := fundingIntent.FundingOutput()
+	if err != nil {
+		req.err <- fmt.Errorf("unable to obtain funding output")
+		return
+	}
+
 	sigTheirCommit, err := l.Cfg.ContextSigner.SignRemoteCommitment(
-		ourContribution,
-		theirContribution,
-		pendingReservation.partialState,
-		pendingReservation.fundingIntent,
+		ourContribution.MultiSigKey,
+		fundingOutput,
+		fundingWitnessScript,
+		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
+		uint64(chanState.Capacity),
+		theirContribution.FirstCommitmentPoint,
 		theirCommitTx,
+		theirWitscriptMap,
 	)
 	if err != nil {
 		req.err <- err

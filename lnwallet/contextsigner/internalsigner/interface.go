@@ -12,7 +12,6 @@ import (
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
-	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/netann"
 )
@@ -168,23 +167,17 @@ func (is *InternalSigner) ReadyChannel(
 }
 
 func (is *InternalSigner) SignRemoteCommitment(
-	ourContribution *lnwallet.ChannelContribution,
-	theirContribution *lnwallet.ChannelContribution,
-	partialState *channeldb.OpenChannel,
-	fundingIntent chanfunding.Intent,
+	ourKey keychain.KeyDescriptor,
+	fundingOutput *wire.TxOut,
+	fundingWitnessScript []byte,
+	chanID lnwire.ChannelID,
+	channelValueSat uint64,
+	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
+	theirWitscriptMap map[[32]byte][]byte,
 ) (input.Signature, error) {
-	// We'll obtain the funding witness script, and the funding
-	// output itself so we can generate a valid signature for the remote
-	// party.
-	fundingWitnessScript, fundingOutput, err := fundingIntent.FundingOutput()
-	if err != nil {
-		return nil, fmt.Errorf("unable to obtain funding output")
-	}
-
 	// Generate our signature for their version of the initial commitment
 	// transaction to hand back to the counterparty.
-	ourKey := ourContribution.MultiSigKey
 	signDesc := input.SignDescriptor{
 		WitnessScript: fundingWitnessScript,
 		KeyDesc:       ourKey,

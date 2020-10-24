@@ -6,7 +6,6 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
-	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -73,11 +72,14 @@ type ChannelContextSigner interface {
 
 	// Generate our signature for the peer's commitment transaction.
 	SignRemoteCommitment(
-		ourContribution *ChannelContribution,
-		theirContribution *ChannelContribution,
-		partialState *channeldb.OpenChannel,
-		fundingIntent chanfunding.Intent,
+		ourKey keychain.KeyDescriptor,
+		fundingOutput *wire.TxOut,
+		fundingWitnessScript []byte,
+		chanID lnwire.ChannelID,
+		channelValueSat uint64,
+		remotePerCommitPoint *btcec.PublicKey,
 		theirCommitTx *wire.MsgTx,
+		theirWitscriptMap map[[32]byte][]byte,
 	) (input.Signature, error)
 
 	// Generate the both the node signature and the bitcoin (funding)

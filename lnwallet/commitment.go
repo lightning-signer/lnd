@@ -580,13 +580,12 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 	fundingOutput wire.TxIn, keyRing *CommitmentKeyRing,
 	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
 	amountToLocal, amountToRemote btcutil.Amount,
-	numHTLCs int64) (*wire.MsgTx, [][]byte, error) {
+	numHTLCs int64) (*wire.MsgTx, map[[32]byte][]byte, error) {
 
-	// We need to return the witscripts, ordered to match the
-	// outputs.  We'll match them after the output sort by pk_hash.
+	// We need to return a map of pkscript to redeem script,
 	witscriptMap := make(map[[32]byte][]byte)
 
-	// A Slice to byte array helper so we can use a map.
+	// A Slice to byte array helper so we can use the map.
 	s2a := func(slice []byte) [32]byte {
 		var hash [32]byte
 		copy(hash[:], slice)
@@ -676,14 +675,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 		}
 	}
 
-	// Scan the transaction, return the witness script for the
-	// matching outputs and []byte{} placeholders for the others.
-	var witscripts [][]byte
-	for _, txi := range commitTx.TxOut {
-		witscripts = append(witscripts, witscriptMap[s2a(txi.PkScript)])
-	}
-
-	return commitTx, witscripts, nil
+	return commitTx, witscriptMap, nil
 }
 
 // CoopCloseBalance returns the final balances that should be used to create
