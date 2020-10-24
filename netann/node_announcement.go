@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/lightningnetwork/lnd/lnwallet"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -39,7 +39,7 @@ func NodeAnnSetTimestamp(nodeAnn *lnwire.NodeAnnouncement) {
 // lnwire.NodeAnnouncement, then signs the resulting announcement. The provided
 // update should be the most recent, valid update, otherwise the timestamp may
 // not monotonically increase from the prior.
-func SignNodeAnnouncement(signer lnwallet.NodeContextSigner,
+func SignNodeAnnouncement(signer contextsigner.NodeContextSigner,
 	pubKey *btcec.PublicKey, nodeAnn *lnwire.NodeAnnouncement,
 	mods ...NodeAnnModifier) error {
 

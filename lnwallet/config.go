@@ -4,6 +4,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/chainntnfs"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
@@ -45,7 +46,7 @@ type Config struct {
 	// The wallet's current ContextSigner implementation.
 	// NOTE: This signer will subsume the input.Signer above when
 	// the ContextSigner implementation is complete.
-	ContextSigner ContextSigner
+	ContextSigner contextsigner.ContextSigner
 
 	// FeeEstimator is the implementation that the wallet will use for the
 	// calculation of on-chain transaction fees.

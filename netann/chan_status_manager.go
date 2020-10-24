@@ -8,7 +8,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/channeldb"
-	"github.com/lightningnetwork/lnd/lnwallet"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -38,7 +38,7 @@ type ChanStatusConfig struct {
 	OurPubKey *btcec.PublicKey
 
 	// MessageSigner signs messages that validate under OurPubKey.
-	MessageSigner lnwallet.NodeContextSigner
+	MessageSigner contextsigner.NodeContextSigner
 
 	// IsChannelActive checks whether the channel identified by the provided
 	// ChannelID is considered active. This should only return true if the

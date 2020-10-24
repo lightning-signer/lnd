@@ -15,8 +15,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/lntypes"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/zpay32"
@@ -36,7 +36,7 @@ type AddInvoiceConfig struct {
 	ChainParams *chaincfg.Params
 
 	// NodeSigner is an implementation of the NodeContextSigner interface.
-	NodeSigner lnwallet.NodeContextSigner
+	NodeSigner contextsigner.NodeContextSigner
 
 	// DefaultCLTVExpiry is the default invoice expiry if no values is
 	// specified.

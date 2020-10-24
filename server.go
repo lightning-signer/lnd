@@ -34,6 +34,7 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
 	"github.com/lightningnetwork/lnd/channelnotifier"
 	"github.com/lightningnetwork/lnd/clock"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/contractcourt"
 	"github.com/lightningnetwork/lnd/discovery"
 	"github.com/lightningnetwork/lnd/feature"
@@ -145,7 +146,7 @@ type server struct {
 	identityECDH keychain.SingleKeyECDH
 
 	// nodeSigner is an implementation of the NodeContextSigner.
-	nodeSigner lnwallet.NodeContextSigner
+	nodeSigner contextsigner.NodeContextSigner
 
 	chanStatusMgr *netann.ChanStatusManager
 

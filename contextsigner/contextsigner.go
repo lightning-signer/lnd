@@ -1,4 +1,4 @@
-package lnwallet
+package contextsigner
 
 import (
 	"github.com/btcsuite/btcd/btcec"

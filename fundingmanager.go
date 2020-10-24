@@ -18,6 +18,7 @@ import (
 	"github.com/lightningnetwork/lnd/chanacceptor"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/discovery"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/input"
@@ -224,7 +225,7 @@ type fundingConfig struct {
 	Notifier chainntnfs.ChainNotifier
 
 	// The ContextSigner is responsible for signing messages.
-	ContextSigner lnwallet.ContextSigner
+	ContextSigner contextsigner.ContextSigner
 
 	// CurrentNodeAnnouncement should return the latest, fully signed node
 	// announcement from the backing Lightning Network node.

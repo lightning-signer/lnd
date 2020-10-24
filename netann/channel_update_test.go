@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lntest/mock"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/netann"
 	"github.com/lightningnetwork/lnd/routing"
@@ -46,7 +46,7 @@ func (ms *mockSigner) SignMessage(
 	return nil, ms.err
 }
 
-var _ lnwallet.NodeContextSigner = (*mockSigner)(nil)
+var _ contextsigner.NodeContextSigner = (*mockSigner)(nil)
 
 var (
 	privKey, _ = btcec.NewPrivateKey(btcec.S256())
@@ -61,7 +61,7 @@ type updateDisableTest struct {
 	startEnabled bool
 	disable      bool
 	startTime    time.Time
-	signer       lnwallet.NodeContextSigner
+	signer       contextsigner.NodeContextSigner
 	expErr       error
 }
 

@@ -9,9 +9,9 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bech32"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/netann"
 )
@@ -106,10 +106,10 @@ func (is *InternalSigner) ShimKeyRing(publicKeyRing keychain.KeyRing) error {
 func (is *InternalSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) (*lnwallet.ChannelBasepoints, error) {
+) (*contextsigner.ChannelBasepoints, error) {
 	// Use the non-secret keyring, it may have been shimmed.
 	var err error
-	var bps lnwallet.ChannelBasepoints
+	var bps contextsigner.ChannelBasepoints
 	bps.MultiSigKey, err = is.publicKeyRing.DeriveNextKey(
 		keychain.KeyFamilyMultiSig,
 	)
@@ -210,4 +210,4 @@ func (is *InternalSigner) SignChannelAnnouncement(
 
 // Compile time check to make sure InternalSigner implements the
 // requisite interfaces.
-var _ lnwallet.ContextSigner = (*InternalSigner)(nil)
+var _ contextsigner.ContextSigner = (*InternalSigner)(nil)
