@@ -13,7 +13,6 @@ import (
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
-	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -297,29 +296,38 @@ func (ss *shadowSigner) ReadyChannel(
 }
 
 func (ss *shadowSigner) SignRemoteCommitment(
-	ourContribution *lnwallet.ChannelContribution,
-	theirContribution *lnwallet.ChannelContribution,
-	partialState *channeldb.OpenChannel,
-	fundingIntent chanfunding.Intent,
+	ourKey keychain.KeyDescriptor,
+	fundingOutput *wire.TxOut,
+	fundingWitnessScript []byte,
+	chanID lnwire.ChannelID,
+	channelValueSat uint64,
+	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
+	theirWitscriptMap map[[32]byte][]byte,
 ) (input.Signature, error) {
 	var err error
 	sig0, err := ss.internalSigner.SignRemoteCommitment(
-		ourContribution,
-		theirContribution,
-		partialState,
-		fundingIntent,
+		ourKey,
+		fundingOutput,
+		fundingWitnessScript,
+		chanID,
+		channelValueSat,
+		remotePerCommitPoint,
 		theirCommitTx,
+		theirWitscriptMap,
 	)
 	if err != nil {
 		return nil, err
 	}
 	sig1, err := ss.remoteSigner.SignRemoteCommitment(
-		ourContribution,
-		theirContribution,
-		partialState,
-		fundingIntent,
+		ourKey,
+		fundingOutput,
+		fundingWitnessScript,
+		chanID,
+		channelValueSat,
+		remotePerCommitPoint,
 		theirCommitTx,
+		theirWitscriptMap,
 	)
 	if err != nil {
 		return nil, err

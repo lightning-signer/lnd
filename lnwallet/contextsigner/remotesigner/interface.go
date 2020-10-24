@@ -15,7 +15,6 @@ import (
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
-	"github.com/lightningnetwork/lnd/lnwallet/chanfunding"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"google.golang.org/grpc"
 )
@@ -464,50 +463,24 @@ func (rsi *RemoteSigner) ReadyChannel(
 }
 
 func (rsi *RemoteSigner) SignRemoteCommitment(
-	ourContribution *lnwallet.ChannelContribution,
-	theirContribution *lnwallet.ChannelContribution,
-	partialState *channeldb.OpenChannel,
-	fundingIntent chanfunding.Intent,
+	ourKey keychain.KeyDescriptor,
+	fundingOutput *wire.TxOut,
+	fundingWitnessScript []byte,
+	chanID lnwire.ChannelID,
+	channelValueSat uint64,
+	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
+	theirWitscriptMap map[[32]byte][]byte,
 ) (input.Signature, error) {
-	fundingOutpoint := &partialState.FundingOutpoint
-	channelValueSat := uint64(partialState.Capacity)
-	remotePerCommitPoint := theirContribution.FirstCommitmentPoint
-	log.Debugf("SignRemoteCommitment request: "+
-		"nodeID=%s, "+
-		"fundingOutpoint=%v, "+
-		"channelValueSat=%v, "+
-		"remotePerCommitPoint=%s, "+
-		"theirCommitTx=%v",
-		hex.EncodeToString(rsi.nodeID[:]),
-		fundingOutpoint,
-		channelValueSat,
-		hex.EncodeToString(remotePerCommitPoint.SerializeCompressed()),
-		theirCommitTx,
-	)
-
 	if rsi.nodeID == nil {
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
-
-	witscripts, err := generateRemoteCommitmentWitnessScripts(
-		remotePerCommitPoint,
-		partialState.ChanType,
-		ourContribution.ChannelConfig,
-		theirContribution.ChannelConfig,
-		theirCommitTx,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	chanID := lnwire.NewChanIDFromOutPoint(fundingOutpoint)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	var rawTxBytes bytes.Buffer
-	err = theirCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	err := theirCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
 	if err != nil {
 		return nil, err
 	}
@@ -522,9 +495,11 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 		},
 	})
 	var outputDescs []*OutputDescriptor
-	for ndx, _ := range theirCommitTx.TxOut {
+	for _, txi := range theirCommitTx.TxOut {
+		var pkscript [32]byte
+		copy(pkscript[:], txi.PkScript)
 		outputDescs = append(outputDescs, &OutputDescriptor{
-			Witscript: witscripts[ndx],
+			Witscript: theirWitscriptMap[pkscript],
 		})
 	}
 
