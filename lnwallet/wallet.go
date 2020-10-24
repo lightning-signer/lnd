@@ -1556,7 +1556,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	// remote node's commitment transactions.
 	localBalance := pendingReservation.partialState.LocalCommitment.LocalBalance.ToSatoshis()
 	remoteBalance := pendingReservation.partialState.LocalCommitment.RemoteBalance.ToSatoshis()
-	ourCommitTx, _, theirCommitTx, _, err := CreateCommitmentTxns(
+	ourCommitTx, _, theirCommitTx, theirWitscriptMap, err := CreateCommitmentTxns(
 		localBalance, remoteBalance,
 		pendingReservation.ourContribution.ChannelConfig,
 		pendingReservation.theirContribution.ChannelConfig,
@@ -1641,18 +1641,16 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 		req.completeChan <- nil
 		return
 	}
-	signDesc := input.SignDescriptor{
-		WitnessScript: witnessScript,
-		KeyDesc:       ourKey,
-		Output: &wire.TxOut{
-			PkScript: p2wsh,
-			Value:    channelValue,
-		},
-		HashType:   txscript.SigHashAll,
-		SigHashes:  txscript.NewTxSigHashes(theirCommitTx),
-		InputIndex: 0,
-	}
-	sigTheirCommit, err := l.Cfg.Signer.SignOutputRaw(theirCommitTx, &signDesc)
+	sigTheirCommit, err := l.Cfg.ContextSigner.SignRemoteCommitment(
+		ourKey,
+		&wire.TxOut{PkScript: p2wsh, Value: channelValue},
+		witnessScript,
+		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
+		uint64(chanState.Capacity),
+		pendingReservation.theirContribution.FirstCommitmentPoint,
+		theirCommitTx,
+		theirWitscriptMap,
+	)
 	if err != nil {
 		req.err <- err
 		req.completeChan <- nil
