@@ -10,9 +10,9 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -23,8 +23,8 @@ import (
 // signers and compares the results.
 
 type shadowSigner struct {
-	internalSigner lnwallet.ContextSigner
-	remoteSigner   lnwallet.ContextSigner
+	internalSigner contextsigner.ContextSigner
+	remoteSigner   contextsigner.ContextSigner
 }
 
 // We need to capture the same seed that the internal wallet uses for
@@ -62,9 +62,9 @@ func GetShadowSeed() []byte {
 }
 
 func NewShadowSigner(
-	internalSigner lnwallet.ContextSigner,
-	remoteSigner lnwallet.ContextSigner,
-) lnwallet.ContextSigner {
+	internalSigner contextsigner.ContextSigner,
+	remoteSigner contextsigner.ContextSigner,
+) contextsigner.ContextSigner {
 	return &shadowSigner{
 		internalSigner: internalSigner,
 		remoteSigner:   remoteSigner,
@@ -191,7 +191,7 @@ func (ss *shadowSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
 func (ss *shadowSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) (*lnwallet.ChannelBasepoints, error) {
+) (*contextsigner.ChannelBasepoints, error) {
 	var err error
 	bps0, err := ss.internalSigner.NewChannel(peerNode, pendingChanID)
 	if err != nil {
@@ -367,7 +367,7 @@ func (ss *shadowSigner) SignChannelAnnouncement(
 	return nodeSig1, bitcoinSig1, nil
 }
 
-func logBasepoints(pfx string, bps *lnwallet.ChannelBasepoints) {
+func logBasepoints(pfx string, bps *contextsigner.ChannelBasepoints) {
 	log.Debugf("%s:         MultiSigKey=%v %s",
 		pfx, bps.MultiSigKey,
 		hex.EncodeToString(bps.MultiSigKey.PubKey.SerializeCompressed()))
@@ -388,4 +388,4 @@ func logBasepoints(pfx string, bps *lnwallet.ChannelBasepoints) {
 
 // Compile time check to make sure shadowSigner implements the
 // requisite interfaces.
-var _ lnwallet.ContextSigner = (*shadowSigner)(nil)
+var _ contextsigner.ContextSigner = (*shadowSigner)(nil)

@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bech32"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -232,7 +233,7 @@ func (rsi *RemoteSigner) SetNodeID(pubkey *btcec.PublicKey) {
 func (rsi *RemoteSigner) NewChannel(
 	peerNode *btcec.PublicKey,
 	pendingChanID [32]byte,
-) (*lnwallet.ChannelBasepoints, error) {
+) (*contextsigner.ChannelBasepoints, error) {
 	log.Debugf("NewChannel request: nodeID=%s, peerNodeID=%s, pendingChanID=%s",
 		hex.EncodeToString(rsi.nodeID[:]),
 		hex.EncodeToString(peerNode.SerializeCompressed()),
@@ -311,7 +312,7 @@ func (rsi *RemoteSigner) NewChannel(
 		hex.EncodeToString(delayPoint.SerializeCompressed()),
 	)
 
-	bps := &lnwallet.ChannelBasepoints{
+	bps := &contextsigner.ChannelBasepoints{
 		MultiSigKey: keychain.KeyDescriptor{
 			KeyLocator: keychain.KeyLocator{
 				Family: keychain.KeyFamilyMultiSig,
@@ -653,4 +654,4 @@ func convertRecoverableSignatureFormat(insig []byte) []byte {
 
 // A compile time check to ensure that RemoteSigner implements the
 // requisite interfaces.
-var _ lnwallet.ChannelContextSigner = (*RemoteSigner)(nil)
+var _ contextsigner.ChannelContextSigner = (*RemoteSigner)(nil)
