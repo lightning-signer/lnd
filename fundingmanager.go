@@ -225,7 +225,7 @@ type fundingConfig struct {
 	Notifier chainntnfs.ChainNotifier
 
 	// The ContextSigner is responsible for signing messages.
-	ContextSigner contextsigner.ContextSigner
+	Signer contextsigner.ContextSigner
 
 	// CurrentNodeAnnouncement should return the latest, fully signed node
 	// announcement from the backing Lightning Network node.
@@ -2846,7 +2846,7 @@ func (f *fundingManager) newChanAnnouncement(localPubKey, remotePubKey,
 	if err != nil {
 		return nil, err
 	}
-	sig, err := f.cfg.ContextSigner.SignChannelUpdate(chanUpdateMsg)
+	sig, err := f.cfg.Signer.SignChannelUpdate(chanUpdateMsg)
 	if err != nil {
 		return nil, errors.Errorf("unable to generate channel "+
 			"update announcement signature: %v", err)
@@ -2869,7 +2869,7 @@ func (f *fundingManager) newChanAnnouncement(localPubKey, remotePubKey,
 		return nil, err
 	}
 	nodeSig, bitcoinSig, err :=
-		f.cfg.ContextSigner.SignChannelAnnouncement(
+		f.cfg.Signer.SignChannelAnnouncement(
 			chanID, localFundingKey, chanAnnMsg)
 	if err != nil {
 		return nil, errors.Errorf("unable to generate node and bitcoin "+

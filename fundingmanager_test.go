@@ -270,8 +270,7 @@ func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 		Notifier:           notifier,
 		SecretKeyRing:      keyRing,
 		WalletController:   wc,
-		Signer:             signer,
-		ContextSigner:      internalSigner,
+		Signer:             internalSigner,
 		ChainIO:            bio,
 		FeeEstimator:       estimator,
 		NetParams:          *netParams,
@@ -365,11 +364,11 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 	chainedAcceptor := chanacceptor.NewChainedAcceptor()
 
 	fundingCfg := fundingConfig{
-		IDKey:         privKey.PubKey(),
-		Wallet:        lnw,
-		Notifier:      chainNotifier,
-		FeeEstimator:  estimator,
-		ContextSigner: internalSigner,
+		IDKey:        privKey.PubKey(),
+		Wallet:       lnw,
+		Notifier:     chainNotifier,
+		FeeEstimator: estimator,
+		Signer:       internalSigner,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 
@@ -507,11 +506,11 @@ func recreateAliceFundingManager(t *testing.T, alice *testNode) {
 	chainedAcceptor := chanacceptor.NewChainedAcceptor()
 
 	f, err := newFundingManager(fundingConfig{
-		IDKey:         oldCfg.IDKey,
-		Wallet:        oldCfg.Wallet,
-		Notifier:      oldCfg.Notifier,
-		FeeEstimator:  oldCfg.FeeEstimator,
-		ContextSigner: oldCfg.ContextSigner,
+		IDKey:        oldCfg.IDKey,
+		Wallet:       oldCfg.Wallet,
+		Notifier:     oldCfg.Notifier,
+		FeeEstimator: oldCfg.FeeEstimator,
+		Signer:       oldCfg.Signer,
 		SendAnnouncement: func(msg lnwire.Message,
 			_ ...discovery.OptionalMsgField) chan error {
 

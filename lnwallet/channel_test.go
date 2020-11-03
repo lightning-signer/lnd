@@ -1007,7 +1007,7 @@ func testForceClose(t *testing.T, testCase *forceCloseTestCase) {
 		Value:    htlcResolution.SweepSignDesc.Output.Value,
 	})
 	htlcResolution.SweepSignDesc.InputIndex = 0
-	sweepTx.TxIn[0].Witness, err = input.HtlcSpendSuccess(aliceChannel.Signer,
+	sweepTx.TxIn[0].Witness, err = input.HtlcSpendSuccess(aliceChannel.Signer.Hack(),
 		&htlcResolution.SweepSignDesc, sweepTx,
 		uint32(aliceChannel.channelState.LocalChanCfg.CsvDelay))
 	if err != nil {
@@ -1071,7 +1071,7 @@ func testForceClose(t *testing.T, testCase *forceCloseTestCase) {
 		Value:    inHtlcResolution.SweepSignDesc.Output.Value,
 	})
 	inHtlcResolution.SweepSignDesc.InputIndex = 0
-	sweepTx.TxIn[0].Witness, err = input.HtlcSpendSuccess(aliceChannel.Signer,
+	sweepTx.TxIn[0].Witness, err = input.HtlcSpendSuccess(aliceChannel.Signer.Hack(),
 		&inHtlcResolution.SweepSignDesc, sweepTx,
 		uint32(aliceChannel.channelState.LocalChanCfg.CsvDelay))
 	if err != nil {
@@ -5825,7 +5825,7 @@ func TestChannelUnilateralCloseHtlcResolution(t *testing.T) {
 	// With the transaction constructed, we'll generate a witness that
 	// should be valid for it, and verify using an instance of Script.
 	sweepTx.TxIn[0].Witness, err = input.ReceiverHtlcSpendTimeout(
-		aliceChannel.Signer, &outHtlcResolution.SweepSignDesc,
+		aliceChannel.Signer.Hack(), &outHtlcResolution.SweepSignDesc,
 		sweepTx, int32(outHtlcResolution.Expiry),
 	)
 	if err != nil {
@@ -5859,7 +5859,7 @@ func TestChannelUnilateralCloseHtlcResolution(t *testing.T) {
 		sweepTx,
 	)
 	sweepTx.TxIn[0].Witness, err = input.SenderHtlcSpendRedeem(
-		aliceChannel.Signer, &inHtlcResolution.SweepSignDesc,
+		aliceChannel.Signer.Hack(), &inHtlcResolution.SweepSignDesc,
 		sweepTx, preimageBob[:],
 	)
 	if err != nil {
@@ -5992,7 +5992,7 @@ func TestChannelUnilateralClosePendingCommit(t *testing.T) {
 	})
 	aliceSignDesc.SigHashes = txscript.NewTxSigHashes(sweepTx)
 	sweepTx.TxIn[0].Witness, err = input.CommitSpendNoDelay(
-		aliceChannel.Signer, &aliceSignDesc, sweepTx, false,
+		aliceChannel.Signer.Hack(), &aliceSignDesc, sweepTx, false,
 	)
 	if err != nil {
 		t.Fatalf("unable to generate sweep witness: %v", err)

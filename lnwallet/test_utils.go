@@ -15,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
@@ -326,8 +327,12 @@ func CreateTestChannels(chanType channeldb.ChannelType) (
 		Packager:                channeldb.NewChannelPackager(shortChanID),
 	}
 
-	aliceSigner := &input.MockSigner{Privkeys: aliceKeys}
-	bobSigner := &input.MockSigner{Privkeys: bobKeys}
+	aliceSigner := contextsigner.NewMockChannelContextSigner(
+		&input.MockSigner{Privkeys: aliceKeys},
+	)
+	bobSigner := contextsigner.NewMockChannelContextSigner(
+		&input.MockSigner{Privkeys: bobKeys},
+	)
 
 	// TODO(roasbeef): make mock version of pre-image store
 

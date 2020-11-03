@@ -337,8 +337,7 @@ func createTestWallet(tempTestDir string, miningNode *rpctest.Harness,
 		Notifier:         notifier,
 		SecretKeyRing:    keyRing,
 		WalletController: wc,
-		Signer:           signer,
-		ContextSigner:    internalSigner,
+		Signer:           internalSigner,
 		ChainIO:          bio,
 		FeeEstimator:     chainfee.NewStaticEstimator(2500, 0),
 		DefaultConstraints: channeldb.ChannelConstraints{
@@ -1760,7 +1759,7 @@ func newTx(t *testing.T, r *rpctest.Harness, pubKey *btcec.PublicKey,
 	// Create a new unconfirmed tx that spends this output.
 	txFee := btcutil.Amount(0.001 * btcutil.SatoshiPerBitcoin)
 	tx1, err := txFromOutput(
-		tx, alice.Cfg.Signer, pubKey, pubKey, txFee, rbf,
+		tx, alice.Cfg.Signer.Hack(), pubKey, pubKey, txFee, rbf,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1861,7 +1860,7 @@ func testPublishTransaction(r *rpctest.Harness,
 		// Now we create a transaction that spends the output from the
 		// tx just mined.
 		tx4, err := txFromOutput(
-			tx3, alice.Cfg.Signer, keyDesc.PubKey,
+			tx3, alice.Cfg.Signer.Hack(), keyDesc.PubKey,
 			keyDesc.PubKey, txFee, rbf,
 		)
 		if err != nil {
@@ -1897,7 +1896,7 @@ func testPublishTransaction(r *rpctest.Harness,
 		// and that pays to a different address. We expect this to be
 		// rejected because it is a double spend.
 		tx5, err := txFromOutput(
-			tx3, alice.Cfg.Signer, keyDesc.PubKey,
+			tx3, alice.Cfg.Signer.Hack(), keyDesc.PubKey,
 			keyDesc2.PubKey, txFee, rbf,
 		)
 		if err != nil {
@@ -1918,7 +1917,7 @@ func testPublishTransaction(r *rpctest.Harness,
 			t.Fatalf("unable to obtain public key: %v", err)
 		}
 		tx6, err := txFromOutput(
-			tx3, alice.Cfg.Signer, keyDesc.PubKey,
+			tx3, alice.Cfg.Signer.Hack(), keyDesc.PubKey,
 			pubKey3.PubKey, 2*txFee, rbf,
 		)
 		if err != nil {
@@ -1958,7 +1957,7 @@ func testPublishTransaction(r *rpctest.Harness,
 			t.Fatalf("unable to obtain public key: %v", err)
 		}
 		tx7, err := txFromOutput(
-			tx3, alice.Cfg.Signer, keyDesc.PubKey,
+			tx3, alice.Cfg.Signer.Hack(), keyDesc.PubKey,
 			pubKey4.PubKey, txFee, false,
 		)
 
@@ -2096,7 +2095,7 @@ func testSignOutputUsingTweaks(r *rpctest.Harness,
 		// With the descriptor created, we use it to generate a
 		// signature, then manually create a valid witness stack we'll
 		// use for signing.
-		spendSig, err := alice.Cfg.Signer.SignOutputRaw(sweepTx, signDesc)
+		spendSig, err := alice.Cfg.Signer.Hack().SignOutputRaw(sweepTx, signDesc)
 		if err != nil {
 			t.Fatalf("unable to generate signature: %v", err)
 		}
@@ -2760,7 +2759,7 @@ func testSignOutputCreateAccount(r *rpctest.Harness, w *lnwallet.LightningWallet
 	// We'll now sign and expect this to succeed, as even though the
 	// account doesn't exist atm, it should be created in order to process
 	// the inbound signing request.
-	_, err := w.Cfg.Signer.SignOutputRaw(fakeTx, signDesc)
+	_, err := w.Cfg.Signer.Hack().SignOutputRaw(fakeTx, signDesc)
 	if err != nil {
 		t.Fatalf("unable to sign for output with non-existent "+
 			"account: %v", err)

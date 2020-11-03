@@ -21,6 +21,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lntypes"
@@ -961,15 +962,20 @@ func createTestChannelsForVectors(tc *testContext, chanType channeldb.ChannelTyp
 	}
 
 	// Create mock signers that can sign for the keys that are used.
-	localSigner := &input.MockSigner{Privkeys: []*btcec.PrivateKey{
-		tc.localPaymentBasepointSecret, tc.localDelayedPaymentBasepointSecret,
-		tc.localFundingPrivkey, localDummy1, localDummy2,
-	}}
+	localSigner := contextsigner.NewMockChannelContextSigner(
+		&input.MockSigner{Privkeys: []*btcec.PrivateKey{
+			tc.localPaymentBasepointSecret,
+			tc.localDelayedPaymentBasepointSecret,
+			tc.localFundingPrivkey, localDummy1, localDummy2,
+		}},
+	)
 
-	remoteSigner := &input.MockSigner{Privkeys: []*btcec.PrivateKey{
-		tc.remoteFundingPrivkey, tc.remoteRevocationBasepointSecret,
-		tc.remotePaymentBasepointSecret, remoteDummy1, remoteDummy2,
-	}}
+	remoteSigner := contextsigner.NewMockChannelContextSigner(
+		&input.MockSigner{Privkeys: []*btcec.PrivateKey{
+			tc.remoteFundingPrivkey, tc.remoteRevocationBasepointSecret,
+			tc.remotePaymentBasepointSecret, remoteDummy1, remoteDummy2,
+		}},
+	)
 
 	remotePool := NewSigPool(1, remoteSigner)
 	channelRemote, err := NewLightningChannel(

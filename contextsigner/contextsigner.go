@@ -39,6 +39,10 @@ type NodeContextSigner interface {
 }
 
 type ChannelContextSigner interface {
+	// TODO - Hack for unconverted code; Remove this when we're done
+	// converting!
+	Hack() input.Signer
+
 	// Update signer with shim for external funding flow.
 	ShimKeyRing(keyRing keychain.KeyRing) error
 
@@ -72,15 +76,20 @@ type ChannelContextSigner interface {
 
 	// Generate our signature for the peer's commitment transaction.
 	SignRemoteCommitment(
-		ourKey keychain.KeyDescriptor,
-		fundingOutput *wire.TxOut,
-		fundingWitnessScript []byte,
 		chanID lnwire.ChannelID,
-		channelValueSat uint64,
+		localMultiSigKey keychain.KeyDescriptor,
+		remoteMultiSigKey keychain.KeyDescriptor,
+		channelValueSat int64,
 		remotePerCommitPoint *btcec.PublicKey,
 		theirCommitTx *wire.MsgTx,
 		theirWitscriptMap map[[32]byte][]byte,
 	) (input.Signature, error)
+
+	// Generate our signatures for the funding transaction.
+	SignFundingTx(
+		signDescs []*input.SignDescriptor,
+		fundingTx *wire.MsgTx,
+	) ([]*input.Script, error)
 
 	// Generate the both the node signature and the bitcoin (funding)
 	// signature for the channel announcement.

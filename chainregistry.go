@@ -140,15 +140,11 @@ type chainControl struct {
 
 	feeEstimator chainfee.Estimator
 
-	signer input.Signer
-
-	contextSigner contextsigner.ContextSigner
+	signer contextsigner.ContextSigner
 
 	keyRing keychain.SecretKeyRing
 
 	wc lnwallet.WalletController
-
-	msgSigner lnwallet.MessageSigner
 
 	chainNotifier chainntnfs.ChainNotifier
 
@@ -518,8 +514,6 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		return nil, err
 	}
 
-	cc.msgSigner = wc
-	cc.signer = wc
 	cc.chainIO = wc
 	cc.wc = wc
 
@@ -536,12 +530,12 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 
 	internalSigner := internalsigner.NewInternalSigner(
 		keyRing,
-		cc.signer,
+		wc,
 		func(pubKey *btcec.PublicKey, msg []byte) (input.Signature, error) {
-			return cc.msgSigner.SignMessage(pubKey, msg)
+			return wc.SignMessage(pubKey, msg)
 		},
 	)
-	cc.contextSigner = internalSigner
+	cc.signer = internalSigner
 
 	// Create, and start the lnwallet, which handles the core payment
 	// channel logic, and exposes control via proxy state machines.
@@ -550,7 +544,6 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		Notifier:           cc.chainNotifier,
 		WalletController:   wc,
 		Signer:             cc.signer,
-		ContextSigner:      cc.contextSigner,
 		FeeEstimator:       cc.feeEstimator,
 		SecretKeyRing:      keyRing,
 		ChainIO:            cc.chainIO,

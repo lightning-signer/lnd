@@ -707,7 +707,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 			KeyRing:    keyRing,
 			ShimIntent: shimIntent,
 		}
-		err = l.Cfg.ContextSigner.ShimKeyRing(keyRing)
+		err = l.Cfg.Signer.ShimKeyRing(keyRing)
 		if err != nil {
 			fundingIntent.Cancel()
 			req.err <- err
@@ -796,7 +796,7 @@ func (l *LightningWallet) initOurContribution(reservation *ChannelReservation,
 	reservation.nodeAddr = nodeAddr
 	reservation.partialState.IdentityPub = nodeID
 
-	bps, err := l.Cfg.ContextSigner.NewChannel(
+	bps, err := l.Cfg.Signer.NewChannel(
 		reservation.partialState.IdentityPub, reservation.pendingChanID)
 	if err != nil {
 		return err
@@ -1134,7 +1134,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.Cfg.ContextSigner.ReadyChannel(
+	err := l.Cfg.Signer.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1238,22 +1238,11 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	chanState.LocalCommitment.CommitTx = ourCommitTx
 	chanState.RemoteCommitment.CommitTx = theirCommitTx
 
-	// Next, we'll obtain the funding witness script, and the funding
-	// output itself so we can generate a valid signature for the remote
-	// party.
-	fundingIntent := pendingReservation.fundingIntent
-	fundingWitnessScript, fundingOutput, err := fundingIntent.FundingOutput()
-	if err != nil {
-		req.err <- fmt.Errorf("unable to obtain funding output")
-		return
-	}
-
-	sigTheirCommit, err := l.Cfg.ContextSigner.SignRemoteCommitment(
-		ourContribution.MultiSigKey,
-		fundingOutput,
-		fundingWitnessScript,
+	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitment(
 		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
-		uint64(chanState.Capacity),
+		ourContribution.MultiSigKey,
+		theirContribution.MultiSigKey,
+		int64(chanState.Capacity),
 		theirContribution.FirstCommitmentPoint,
 		theirCommitTx,
 		theirWitscriptMap,
@@ -1529,7 +1518,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	pstate := pendingReservation.partialState
 	ours := pendingReservation.ourContribution
 	theirs := pendingReservation.theirContribution
-	err := l.Cfg.ContextSigner.ReadyChannel(
+	err := l.Cfg.Signer.ReadyChannel(
 		pstate.IdentityPub,
 		pendingReservation.pendingChanID,
 		pstate.IsInitiator,
@@ -1637,18 +1626,11 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	// With their signature for our version of the commitment transactions
 	// verified, we can now generate a signature for their version,
 	// allowing the funding transaction to be safely broadcast.
-	p2wsh, err := input.WitnessScriptHash(witnessScript)
-	if err != nil {
-		req.err <- err
-		req.completeChan <- nil
-		return
-	}
-	sigTheirCommit, err := l.Cfg.ContextSigner.SignRemoteCommitment(
-		ourKey,
-		&wire.TxOut{PkScript: p2wsh, Value: channelValue},
-		witnessScript,
+	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitment(
 		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
-		uint64(chanState.Capacity),
+		ourKey,
+		theirKey,
+		int64(chanState.Capacity),
 		pendingReservation.theirContribution.FirstCommitmentPoint,
 		theirCommitTx,
 		theirWitscriptMap,

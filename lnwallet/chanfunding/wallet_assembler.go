@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/txsort"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 )
@@ -43,7 +44,7 @@ type FullIntent struct {
 	coinSource CoinSource
 
 	// signer is the Assembler's instance of the Singer interface.
-	signer input.Signer
+	signer contextsigner.ChannelContextSigner
 }
 
 // BindKeys is a method unique to the FullIntent variant. This allows the
@@ -104,13 +105,14 @@ func (f *FullIntent) CompileFundingTx(extraInputs []*wire.TxIn,
 		fundingTx, fundingOutput.PkScript,
 	)
 
-	// Next, sign all inputs that are ours, collecting the signatures in
-	// order of the inputs.
-	signDesc := input.SignDescriptor{
-		HashType:  txscript.SigHashAll,
-		SigHashes: txscript.NewTxSigHashes(fundingTx),
-	}
+	// Next, accumulate SignDescriptors for all inputs that are ours.
+	signDescs := []*input.SignDescriptor{}
 	for i, txIn := range fundingTx.TxIn {
+		signDesc := input.SignDescriptor{
+			HashType:  txscript.SigHashAll,
+			SigHashes: txscript.NewTxSigHashes(fundingTx),
+		}
+
 		// We can only sign this input if it's ours, so we'll ask the
 		// coin source if it can map this outpoint into a coin we own.
 		// If not, then we'll continue as it isn't our input.
@@ -118,6 +120,7 @@ func (f *FullIntent) CompileFundingTx(extraInputs []*wire.TxIn,
 			txIn.PreviousOutPoint,
 		)
 		if err != nil {
+			signDescs = append(signDescs, nil)
 			continue
 		}
 
@@ -129,17 +132,19 @@ func (f *FullIntent) CompileFundingTx(extraInputs []*wire.TxIn,
 		}
 		signDesc.InputIndex = i
 
-		// Finally, we'll sign the input as is, and populate the input
-		// with the witness and sigScript (if needed).
-		inputScript, err := f.signer.ComputeInputScript(
-			fundingTx, &signDesc,
-		)
-		if err != nil {
-			return nil, err
-		}
+		signDescs = append(signDescs, &signDesc)
+	}
 
-		txIn.SignatureScript = inputScript.SigScript
-		txIn.Witness = inputScript.Witness
+	// Sign all of the inputs that are ours.
+	scripts, err := f.signer.SignFundingTx(signDescs, fundingTx)
+	if err != nil {
+		return nil, err
+	}
+	for ii, txIn := range fundingTx.TxIn {
+		if scripts[ii] != nil {
+			txIn.SignatureScript = scripts[ii].SigScript
+			txIn.Witness = scripts[ii].Witness
+		}
 	}
 
 	// Finally, we'll populate the chanPoint now that we've fully
@@ -183,7 +188,7 @@ type WalletConfig struct {
 
 	// Signer allows the WalletAssembler to sign inputs on any potential
 	// funding transactions.
-	Signer input.Signer
+	Signer contextsigner.ChannelContextSigner
 
 	// DustLimit is the current dust limit. We'll use this to ensure that
 	// we don't make dust outputs on the funding transaction.

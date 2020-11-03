@@ -21,6 +21,7 @@ import (
 	"github.com/lightningnetwork/lnd/chainntnfs"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/channelnotifier"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/contractcourt"
 	"github.com/lightningnetwork/lnd/discovery"
 	"github.com/lightningnetwork/lnd/feature"
@@ -28,7 +29,6 @@ import (
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/htlcswitch/hodl"
 	"github.com/lightningnetwork/lnd/htlcswitch/hop"
-	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnpeer"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -211,7 +211,7 @@ type Config struct {
 	FeeEstimator chainfee.Estimator
 
 	// Signer is used when creating *lnwallet.LightningChannel instances.
-	Signer input.Signer
+	Signer contextsigner.ChannelContextSigner
 
 	// SigPool is used when creating *lnwallet.LightningChannel instances.
 	SigPool *lnwallet.SigPool

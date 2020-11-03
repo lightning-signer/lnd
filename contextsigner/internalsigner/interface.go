@@ -96,6 +96,11 @@ func (is *InternalSigner) SignMessage(
 	return is.nodeSigner.SignCompact(dataToSign)
 }
 
+// TODO - Remove this hack.
+func (is *InternalSigner) Hack() input.Signer {
+	return is.signer
+}
+
 func (is *InternalSigner) ShimKeyRing(publicKeyRing keychain.KeyRing) error {
 	// Replace the non-secret keyring w/ shimmed version.
 	is.publicKeyRing = publicKeyRing
@@ -167,26 +172,60 @@ func (is *InternalSigner) ReadyChannel(
 }
 
 func (is *InternalSigner) SignRemoteCommitment(
-	ourKey keychain.KeyDescriptor,
-	fundingOutput *wire.TxOut,
-	fundingWitnessScript []byte,
 	chanID lnwire.ChannelID,
-	channelValueSat uint64,
+	localMultiSigKey keychain.KeyDescriptor,
+	remoteMultiSigKey keychain.KeyDescriptor,
+	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
 	theirWitscriptMap map[[32]byte][]byte,
 ) (input.Signature, error) {
+	fundingWitnessScript, fundingOutput, err := input.GenFundingPkScript(
+		localMultiSigKey.PubKey.SerializeCompressed(),
+		remoteMultiSigKey.PubKey.SerializeCompressed(),
+		channelValueSat,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	// Generate our signature for their version of the initial commitment
 	// transaction to hand back to the counterparty.
 	signDesc := input.SignDescriptor{
 		WitnessScript: fundingWitnessScript,
-		KeyDesc:       ourKey,
+		KeyDesc:       localMultiSigKey,
 		Output:        fundingOutput,
 		HashType:      txscript.SigHashAll,
 		SigHashes:     txscript.NewTxSigHashes(theirCommitTx),
 		InputIndex:    0,
 	}
 	return is.signer.SignOutputRaw(theirCommitTx, &signDesc)
+}
+
+func (is *InternalSigner) SignFundingTx(
+	signDescs []*input.SignDescriptor,
+	fundingTx *wire.MsgTx,
+) ([]*input.Script, error) {
+	scripts := []*input.Script{}
+	for i, _ := range fundingTx.TxIn {
+		// Skip if this input isn't ours.
+		if signDescs[i] == nil {
+			scripts = append(scripts, nil)
+			continue
+		}
+
+		// Finally, we'll sign the input as is, and populate the input
+		// with the witness and sigScript (if needed).
+		inputScript, err := is.signer.ComputeInputScript(
+			fundingTx, signDescs[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		scripts = append(scripts, inputScript)
+	}
+	return scripts, nil
 }
 
 func (is *InternalSigner) SignChannelAnnouncement(

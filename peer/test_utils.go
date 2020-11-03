@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/lightningnetwork/lnd/chainntnfs"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -324,8 +325,12 @@ func createTestPeer(notifier chainntnfs.ChainNotifier,
 		os.RemoveAll(alicePath)
 	}
 
-	aliceSigner := &mock.SingleSigner{Privkey: aliceKeyPriv}
-	bobSigner := &mock.SingleSigner{Privkey: bobKeyPriv}
+	aliceSigner := contextsigner.NewMockChannelContextSigner(
+		&mock.SingleSigner{Privkey: aliceKeyPriv},
+	)
+	bobSigner := contextsigner.NewMockChannelContextSigner(
+		&mock.SingleSigner{Privkey: bobKeyPriv},
+	)
 
 	alicePool := lnwallet.NewSigPool(1, aliceSigner)
 	channelAlice, err := lnwallet.NewLightningChannel(

@@ -5,8 +5,8 @@ package invoicesrpc
 import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lightningnetwork/lnd/channeldb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/invoices"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/macaroons"
 )
@@ -38,7 +38,7 @@ type Config struct {
 
 	// NodeSigner is an implementation of the MessageSigner implementation
 	// that's backed by the identity private key of the running lnd node.
-	NodeSigner lnwallet.NodeContextSigner
+	NodeSigner contextsigner.NodeContextSigner
 
 	// DefaultCLTVExpiry is the default invoice expiry if no values is
 	// specified.

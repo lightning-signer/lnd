@@ -321,7 +321,7 @@ func (s *Server) SignOutputRaw(ctx context.Context, in *SignReq) (*SignResp, err
 		RawSigs: make([][]byte, numSigs),
 	}
 	for i, signDesc := range signDescs {
-		sig, err := s.cfg.Signer.SignOutputRaw(&txToSign, signDesc)
+		sig, err := s.cfg.Signer.Hack().SignOutputRaw(&txToSign, signDesc)
 		if err != nil {
 			log.Errorf("unable to generate sig for input "+
 				"#%v: %v", i, err)
@@ -395,7 +395,7 @@ func (s *Server) ComputeInputScript(ctx context.Context,
 		InputScripts: make([]*InputScript, numWitnesses),
 	}
 	for i, signDesc := range signDescs {
-		inputScript, err := s.cfg.Signer.ComputeInputScript(
+		inputScript, err := s.cfg.Signer.Hack().ComputeInputScript(
 			&txToSign, signDesc,
 		)
 		if err != nil {

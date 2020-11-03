@@ -5,7 +5,6 @@ import (
 	"github.com/lightningnetwork/lnd/chainntnfs"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
-	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
 )
@@ -36,17 +35,8 @@ type Config struct {
 	// specific interaction is proxied to the internal wallet.
 	WalletController WalletController
 
-	// Signer is the wallet's current Signer implementation. This Signer is
-	// used to generate signature for all inputs to potential funding
-	// transactions, as well as for spends from the funding transaction to
-	// update the commitment state.
-	// TODO: Remove this when the ContextSigner is complete.
-	Signer input.Signer
-
 	// The wallet's current ContextSigner implementation.
-	// NOTE: This signer will subsume the input.Signer above when
-	// the ContextSigner implementation is complete.
-	ContextSigner contextsigner.ContextSigner
+	Signer contextsigner.ContextSigner
 
 	// FeeEstimator is the implementation that the wallet will use for the
 	// calculation of on-chain transaction fees.

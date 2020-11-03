@@ -346,7 +346,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 
 	var (
 		err         error
-		nodeKeyECDH = cc.contextSigner
+		nodeKeyECDH = cc.signer
 	)
 
 	listeners := make([]net.Listener, len(listenAddrs))
@@ -432,7 +432,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		channelNotifier: channelnotifier.New(remoteChanDB),
 
 		identityECDH: nodeKeyECDH,
-		nodeSigner:   cc.contextSigner,
+		nodeSigner:   cc.signer,
 
 		listenAddrs: listenAddrs,
 
@@ -834,7 +834,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 	s.sweeper = sweep.New(&sweep.UtxoSweeperConfig{
 		FeeEstimator:   cc.feeEstimator,
 		GenSweepScript: newSweepPkScriptGen(cc.wallet),
-		Signer:         cc.wallet.Cfg.Signer,
+		Signer:         cc.wallet.Cfg.Signer.Hack(),
 		Wallet:         cc.wallet,
 		NewBatchTimer: func() <-chan time.Time {
 			return time.NewTimer(sweep.DefaultBatchWindowDuration).C
@@ -963,7 +963,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		Notifier:           cc.chainNotifier,
 		PublishTransaction: cc.wallet.PublishTransaction,
 		ContractBreaches:   contractBreaches,
-		Signer:             cc.wallet.Cfg.Signer,
+		Signer:             cc.wallet.Cfg.Signer.Hack(),
 		Store:              newRetributionStore(remoteChanDB),
 	})
 
@@ -992,9 +992,9 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		UpdateLabel: func(hash chainhash.Hash, label string) error {
 			return cc.wallet.LabelTransaction(hash, label, true)
 		},
-		Notifier:      cc.chainNotifier,
-		FeeEstimator:  cc.feeEstimator,
-		ContextSigner: cc.contextSigner,
+		Notifier:     cc.chainNotifier,
+		FeeEstimator: cc.feeEstimator,
+		Signer:       cc.signer,
 		CurrentNodeAnnouncement: func() (lnwire.NodeAnnouncement, error) {
 			return s.genNodeAnnouncement(true)
 		},
@@ -1240,7 +1240,7 @@ func newServer(cfg *Config, listenAddrs []net.Addr,
 		}
 
 		s.towerClient, err = wtclient.New(&wtclient.Config{
-			Signer:         cc.wallet.Cfg.Signer,
+			Signer:         cc.wallet.Cfg.Signer.Hack(),
 			NewAddress:     newSweepPkScriptGen(cc.wallet),
 			SecretKeyRing:  s.cc.keyRing,
 			Dial:           cfg.net.Dial,

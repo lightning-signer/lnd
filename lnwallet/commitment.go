@@ -396,7 +396,9 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	theirBalance lnwire.MilliSatoshi, isOurs bool,
 	feePerKw chainfee.SatPerKWeight, height uint64,
 	filteredHTLCView *htlcView,
-	keyRing *CommitmentKeyRing) (*unsignedCommitmentTx, error) {
+	keyRing *CommitmentKeyRing) (*unsignedCommitmentTx, map[[32]byte][]byte, error) {
+	// We need to return a map of pkscript to redeem script,
+	var witscriptMap map[[32]byte][]byte
 
 	dustLimit := cb.chanState.LocalChanCfg.DustLimit
 	if !isOurs {
@@ -465,14 +467,14 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	// a new commitment transaction with all the latest unsettled/un-timed
 	// out HTLCs.
 	if isOurs {
-		commitTx, _, err = CreateCommitTx(
+		commitTx, witscriptMap, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.LocalChanCfg, &cb.chanState.RemoteChanCfg,
 			ourBalance.ToSatoshis(), theirBalance.ToSatoshis(),
 			numHTLCs,
 		)
 	} else {
-		commitTx, _, err = CreateCommitTx(
+		commitTx, witscriptMap, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.RemoteChanCfg, &cb.chanState.LocalChanCfg,
 			theirBalance.ToSatoshis(), ourBalance.ToSatoshis(),
@@ -480,7 +482,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 		)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// We'll now add all the HTLC outputs to the commitment transaction.
@@ -506,7 +508,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 			cb.chanState.ChanType,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cltvs = append(cltvs, htlc.Timeout)
 	}
@@ -523,7 +525,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 			cb.chanState.ChanType,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cltvs = append(cltvs, htlc.Timeout)
 	}
@@ -533,7 +535,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	// uncooperative broadcast.
 	err = SetStateNumHint(commitTx, height, cb.obfuscator)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Sort the transactions according to the agreed upon canonical
@@ -545,7 +547,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	// transaction which would be invalid by consensus.
 	uTx := btcutil.NewTx(commitTx)
 	if err := blockchain.CheckTransactionSanity(uTx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Finally, we'll assert that were not attempting to draw more out of
@@ -555,7 +557,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 		totalOut += btcutil.Amount(txOut.Value)
 	}
 	if totalOut > cb.chanState.Capacity {
-		return nil, fmt.Errorf("height=%v, for ChannelPoint(%v) "+
+		return nil, nil, fmt.Errorf("height=%v, for ChannelPoint(%v) "+
 			"attempts to consume %v while channel capacity is %v",
 			height, cb.chanState.FundingOutpoint,
 			totalOut, cb.chanState.Capacity)
@@ -567,7 +569,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 		ourBalance:   ourBalance,
 		theirBalance: theirBalance,
 		cltvs:        cltvs,
-	}, nil
+	}, witscriptMap, nil
 }
 
 // CreateCommitTx creates a commitment transaction, spending from specified

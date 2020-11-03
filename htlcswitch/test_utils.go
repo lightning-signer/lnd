@@ -24,6 +24,7 @@ import (
 	sphinx "github.com/lightningnetwork/lightning-onion"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/channeldb/kvdb"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/contractcourt"
 	"github.com/lightningnetwork/lnd/htlcswitch/hop"
 	"github.com/lightningnetwork/lnd/input"
@@ -377,8 +378,12 @@ func createTestChannel(alicePrivKey, bobPrivKey []byte,
 		os.RemoveAll(alicePath)
 	}
 
-	aliceSigner := &mock.SingleSigner{Privkey: aliceKeyPriv}
-	bobSigner := &mock.SingleSigner{Privkey: bobKeyPriv}
+	aliceSigner := contextsigner.NewMockChannelContextSigner(
+		&mock.SingleSigner{Privkey: aliceKeyPriv},
+	)
+	bobSigner := contextsigner.NewMockChannelContextSigner(
+		&mock.SingleSigner{Privkey: bobKeyPriv},
+	)
 
 	alicePool := lnwallet.NewSigPool(runtime.NumCPU(), aliceSigner)
 	channelAlice, err := lnwallet.NewLightningChannel(

@@ -6,6 +6,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
@@ -127,7 +128,7 @@ type SigPool struct {
 	started sync.Once
 	stopped sync.Once
 
-	signer input.Signer
+	signer contextsigner.ChannelContextSigner
 
 	verifyJobs chan VerifyJob
 	signJobs   chan SignJob
@@ -141,7 +142,7 @@ type SigPool struct {
 // NewSigPool creates a new signature pool with the specified number of
 // workers. The recommended parameter for the number of works is the number of
 // physical CPU cores available on the target machine.
-func NewSigPool(numWorkers int, signer input.Signer) *SigPool {
+func NewSigPool(numWorkers int, signer contextsigner.ChannelContextSigner) *SigPool {
 	return &SigPool{
 		signer:     signer,
 		numWorkers: numWorkers,
@@ -188,7 +189,7 @@ func (s *SigPool) poolWorker() {
 		// send the result along with a possible error back to the
 		// caller.
 		case sigMsg := <-s.signJobs:
-			rawSig, err := s.signer.SignOutputRaw(
+			rawSig, err := s.signer.Hack().SignOutputRaw(
 				sigMsg.Tx, &sigMsg.SignDesc,
 			)
 			if err != nil {
