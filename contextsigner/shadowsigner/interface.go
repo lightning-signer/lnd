@@ -155,6 +155,11 @@ func (ss *shadowSigner) SignInvoice(
 	return hash1, sig1, nil
 }
 
+// TODO - Remove this hack.
+func (ss *shadowSigner) Hack() input.Signer {
+	return ss.internalSigner.Hack()
+}
+
 func (ss *shadowSigner) SignMessage(
 	dataToSign []byte) ([]byte, error) {
 	sig0, err := ss.internalSigner.SignMessage(dataToSign)
@@ -298,21 +303,19 @@ func (ss *shadowSigner) ReadyChannel(
 }
 
 func (ss *shadowSigner) SignRemoteCommitment(
-	ourKey keychain.KeyDescriptor,
-	fundingOutput *wire.TxOut,
-	fundingWitnessScript []byte,
 	chanID lnwire.ChannelID,
-	channelValueSat uint64,
+	localMultiSigKey keychain.KeyDescriptor,
+	remoteMultiSigKey keychain.KeyDescriptor,
+	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
 	theirWitscriptMap map[[32]byte][]byte,
 ) (input.Signature, error) {
 	var err error
 	sig0, err := ss.internalSigner.SignRemoteCommitment(
-		ourKey,
-		fundingOutput,
-		fundingWitnessScript,
 		chanID,
+		localMultiSigKey,
+		remoteMultiSigKey,
 		channelValueSat,
 		remotePerCommitPoint,
 		theirCommitTx,
@@ -322,10 +325,9 @@ func (ss *shadowSigner) SignRemoteCommitment(
 		return nil, err
 	}
 	sig1, err := ss.remoteSigner.SignRemoteCommitment(
-		ourKey,
-		fundingOutput,
-		fundingWitnessScript,
 		chanID,
+		localMultiSigKey,
+		remoteMultiSigKey,
 		channelValueSat,
 		remotePerCommitPoint,
 		theirCommitTx,
@@ -339,6 +341,25 @@ func (ss *shadowSigner) SignRemoteCommitment(
 			"internal=%v remote=%v", sig0, sig1)
 	}
 	return sig1, nil
+}
+
+func (ss *shadowSigner) SignFundingTx(
+	signDescs []*input.SignDescriptor,
+	fundingTx *wire.MsgTx,
+) ([]*input.Script, error) {
+	scripts0, err := ss.internalSigner.SignFundingTx(signDescs, fundingTx)
+	if err != nil {
+		return nil, err
+	}
+	scripts1, err := ss.remoteSigner.SignFundingTx(signDescs, fundingTx)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(scripts0, scripts1) {
+		return nil, fmt.Errorf("ShadowSigner.SignFundingTx mismatch: "+
+			"internal=%v remote=%v", scripts0, scripts1)
+	}
+	return scripts1, nil
 }
 
 func (ss *shadowSigner) SignChannelAnnouncement(

@@ -177,6 +177,12 @@ func (rsi *RemoteSigner) SignMessage(
 	return convertRecoverableSignatureFormat(rsp.Signature.Data), nil
 }
 
+// TODO - Remove this hack.
+func (rs *RemoteSigner) Hack() input.Signer {
+	// We can't support this hack, so just panic
+	panic("RemoteSigner.Hack() CALLED!")
+}
+
 func (rsi *RemoteSigner) ShimKeyRing(keyRing keychain.KeyRing) error {
 	// The current remotesigner cannot support external funding.
 	return fmt.Errorf("remotesigner does not support external funding")
@@ -436,11 +442,10 @@ func (rsi *RemoteSigner) ReadyChannel(
 }
 
 func (rsi *RemoteSigner) SignRemoteCommitment(
-	ourKey keychain.KeyDescriptor,
-	fundingOutput *wire.TxOut,
-	fundingWitnessScript []byte,
 	chanID lnwire.ChannelID,
-	channelValueSat uint64,
+	localMultiSigKey keychain.KeyDescriptor,
+	remoteMultiSigKey keychain.KeyDescriptor,
+	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
 	theirWitscriptMap map[[32]byte][]byte,
@@ -497,6 +502,13 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 
 	// Chop off the sighash flag at the end of the signature.
 	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
+}
+
+func (rs *RemoteSigner) SignFundingTx(
+	signDescs []*input.SignDescriptor,
+	fundingTx *wire.MsgTx,
+) ([]*input.Script, error) {
+	panic("RemoteSigner.SignFundingTx UNIMPLEMENTED")
 }
 
 func (rsi *RemoteSigner) SignChannelAnnouncement(
