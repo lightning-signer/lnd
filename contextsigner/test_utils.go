@@ -74,6 +74,7 @@ func (ms *MockChannelContextSigner) SignMutualCloseTx(
 
 func (ms *MockChannelContextSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
+	multiSigIndex uint32,
 	fundingTx *wire.MsgTx,
 ) ([]*input.Script, error) {
 	return nil, fmt.Errorf("MockChannelContextSigner unimplemented " +

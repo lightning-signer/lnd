@@ -181,6 +181,7 @@ func (is *InternalSigner) SignMutualCloseTx(
 
 func (is *InternalSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
+	multiSigIndex uint32,
 	fundingTx *wire.MsgTx,
 ) ([]*input.Script, error) {
 	scripts := []*input.Script{}

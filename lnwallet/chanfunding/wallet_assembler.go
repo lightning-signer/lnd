@@ -136,7 +136,7 @@ func (f *FullIntent) CompileFundingTx(extraInputs []*wire.TxIn,
 	}
 
 	// Sign all of the inputs that are ours.
-	scripts, err := f.signer.SignFundingTx(signDescs, fundingTx)
+	scripts, err := f.signer.SignFundingTx(signDescs, multiSigIndex, fundingTx)
 	if err != nil {
 		return nil, err
 	}

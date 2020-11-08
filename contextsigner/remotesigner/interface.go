@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bech32"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
@@ -504,11 +505,94 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
 }
 
-func (rs *RemoteSigner) SignFundingTx(
+func (rsi *RemoteSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
+	multiSigIndex uint32,
 	fundingTx *wire.MsgTx,
 ) ([]*input.Script, error) {
-	panic("RemoteSigner.SignFundingTx UNIMPLEMENTED")
+	log.Debugf("signDescs: %v", spew.Sdump(signDescs))
+
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	fundingOutpoint := &wire.OutPoint{
+		Hash:  fundingTx.TxHash(),
+		Index: multiSigIndex,
+	}
+	chanID := lnwire.NewChanIDFromOutPoint(fundingOutpoint)
+
+	var rawTxBytes bytes.Buffer
+	err := fundingTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	var inputDescs []*InputDescriptor
+	for ndx, txi := range fundingTx.TxIn {
+		log.Debugf("txi[%d]: %v", ndx, spew.Sdump(txi))
+		desc := signDescs[ndx]
+
+		// FIXME - We need DerivationInfo here for the desc.
+
+		inputDescs = append(inputDescs, &InputDescriptor{
+			KeyLoc: &KeyLocator{KeyIndex: int32(desc.KeyDesc.KeyLocator.Index)},
+			PrevOutput: &TxOut{
+				ValueSat: desc.Output.Value,
+				// PkScript: desc.Output.PkScript, // FIXME - not set in c-lightning?
+			},
+			SpendType: SpendType_P2WPKH, // FIXME - make dynamic
+			// FIXME - how to figure this out?
+			// CloseInfo: &CloseInfo{
+			//     ChanneNonce:  &ChannelNonce{Data: peerChanID[:]},
+			//     CommitmentPoint: maybeCommitmentPoint,
+			// },
+			RedeemScript: desc.WitnessScript, // FIXME - not set in c-lightning?
+		})
+	}
+
+	rsp, err := rsi.client.SignFundingTx(ctx,
+		&SignFundingTxRequest{
+			NodeId:       &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
+			Tx: &Transaction{
+				RawTxBytes: rawTxBytes.Bytes(),
+				InputDescs: inputDescs,
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	scripts := []*input.Script{}
+	for _, wit := range rsp.Witnesses {
+		if wit == nil {
+			scripts = append(scripts, nil)
+		} else {
+			// sig0 := wit.Signature.Data
+			// // Chop off the sighash flag at the end of the signature.
+			// sig, err := btcec.ParseDERSignature(
+			// 	sig0[:len(sig0)-1], btcec.S256())
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// pubkey, err := btcec.ParsePubKey(wit.Pubkey.Data, btcec.S256())
+			// if err != nil {
+			// 	return nil, err
+			// }
+			witness := wire.TxWitness{
+				wit.Signature.Data,
+				wit.Pubkey.Data,
+			}
+			script := &input.Script{Witness: witness}
+			scripts = append(scripts, script)
+		}
+	}
+	return scripts, nil
 }
 
 func (rsi *RemoteSigner) SignChannelAnnouncement(

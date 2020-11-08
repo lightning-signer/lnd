@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
@@ -345,19 +346,23 @@ func (ss *shadowSigner) SignRemoteCommitment(
 
 func (ss *shadowSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
+	multiSigIndex uint32,
 	fundingTx *wire.MsgTx,
 ) ([]*input.Script, error) {
-	scripts0, err := ss.internalSigner.SignFundingTx(signDescs, fundingTx)
+	scripts0, err := ss.internalSigner.SignFundingTx(
+		signDescs, multiSigIndex, fundingTx)
 	if err != nil {
 		return nil, err
 	}
-	scripts1, err := ss.remoteSigner.SignFundingTx(signDescs, fundingTx)
+	scripts1, err := ss.remoteSigner.SignFundingTx(
+		signDescs, multiSigIndex, fundingTx)
 	if err != nil {
 		return nil, err
 	}
 	if !reflect.DeepEqual(scripts0, scripts1) {
 		return nil, fmt.Errorf("ShadowSigner.SignFundingTx mismatch: "+
-			"internal=%v remote=%v", scripts0, scripts1)
+			"\ninternal=%v\nremote=%v",
+			spew.Sdump(scripts0), spew.Sdump(scripts1))
 	}
 	return scripts1, nil
 }

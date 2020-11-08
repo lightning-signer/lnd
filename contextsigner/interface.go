@@ -84,6 +84,7 @@ type ChannelContextSigner interface {
 	// Generate our signatures for the funding transaction.
 	SignFundingTx(
 		signDescs []*input.SignDescriptor,
+		multiSigIndex uint32,
 		fundingTx *wire.MsgTx,
 	) ([]*input.Script, error)
 
