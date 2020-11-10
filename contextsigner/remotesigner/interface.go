@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bech32"
+	"github.com/btcsuite/btcwallet/waddrmgr"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
@@ -21,9 +22,16 @@ import (
 	"google.golang.org/grpc"
 )
 
+type TxInResolver interface {
+	ResolveDerivation(
+		signDesc *input.SignDescriptor,
+	) (waddrmgr.KeyScope, waddrmgr.DerivationPath, error)
+}
+
 type RemoteSigner struct {
 	networkName    string
 	serverAddr     string
+	txInResolver   TxInResolver
 	conn           *grpc.ClientConn
 	client         SignerClient
 	nodeID         []byte
@@ -34,6 +42,7 @@ type RemoteSigner struct {
 func NewRemoteSigner(
 	networkName string,
 	serverAddr string,
+	txInResolver TxInResolver,
 ) (*RemoteSigner, error) {
 	log.Infof("NewRemoteSigner: networkName=%s serverAddr=%s",
 		networkName, serverAddr)
@@ -46,6 +55,7 @@ func NewRemoteSigner(
 	return &RemoteSigner{
 		networkName:    networkName,
 		serverAddr:     serverAddr,
+		txInResolver:   txInResolver,
 		conn:           conn,
 		client:         NewSignerClient(conn),
 		basePointIndex: 0,
@@ -536,10 +546,23 @@ func (rsi *RemoteSigner) SignFundingTx(
 		log.Debugf("txi[%d]: %v", ndx, spew.Sdump(txi))
 		desc := signDescs[ndx]
 
-		// FIXME - We need DerivationInfo here for the desc.
+		keyScope, derivPath, err := rsi.txInResolver.ResolveDerivation(desc)
+		if err != nil {
+			return nil, err
+		}
+		if keyScope.Purpose != 84 || keyScope.Coin != 0 {
+			return nil, fmt.Errorf(
+				"remotesigner can't sign input %d with KeyScope %v",
+				ndx, keyScope)
+		}
+		if derivPath.Account != 0 || derivPath.Branch != 0 {
+			return nil, fmt.Errorf(
+				"remotesigner can't sign input %d with DerivationPath %v",
+				ndx, derivPath)
+		}
 
 		inputDescs = append(inputDescs, &InputDescriptor{
-			KeyLoc: &KeyLocator{KeyIndex: int32(desc.KeyDesc.KeyLocator.Index)},
+			KeyLoc: &KeyLocator{KeyIndex: int32(derivPath.Index)},
 			PrevOutput: &TxOut{
 				ValueSat: desc.Output.Value,
 				// PkScript: desc.Output.PkScript, // FIXME - not set in c-lightning?

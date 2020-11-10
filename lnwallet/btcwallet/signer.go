@@ -1,6 +1,7 @@
 package btcwallet
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -350,6 +351,25 @@ func (b *BtcWallet) ComputeInputScript(tx *wire.MsgTx,
 	inputScript.Witness = witnessScript
 
 	return inputScript, nil
+}
+
+func (b *BtcWallet) ResolveDerivation(signDesc *input.SignDescriptor) (
+	waddrmgr.KeyScope, waddrmgr.DerivationPath, error) {
+
+	outputScript := signDesc.Output.PkScript
+	walletAddr, err := b.fetchOutputAddr(outputScript)
+	if err != nil {
+		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{}, err
+	}
+
+	pka := walletAddr.(waddrmgr.ManagedPubKeyAddress)
+	keyScope, derivPath, ok := pka.DerivationInfo()
+	if !ok {
+		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{},
+			fmt.Errorf("Cannot provide address derivation")
+	}
+
+	return keyScope, derivPath, nil
 }
 
 // A compile time check to ensure that BtcWallet implements the Signer

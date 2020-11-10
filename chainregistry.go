@@ -557,7 +557,7 @@ func newChainControlFromConfig(cfg *Config, localDB, remoteDB *channeldb.DB,
 		network = "mainnet"
 	}
 	remoteSigner, err := remotesigner.NewRemoteSigner(
-		network, "localhost:50051")
+		network, "localhost:50051", wc)
 	if err != nil {
 		fmt.Printf("unable to initialize remotesigner: %v\n", err)
 		return nil, err
