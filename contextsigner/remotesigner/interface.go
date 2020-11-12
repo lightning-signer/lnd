@@ -555,14 +555,14 @@ func (rsi *RemoteSigner) SignFundingTx(
 				"remotesigner can't sign input %d with KeyScope %v",
 				ndx, keyScope)
 		}
-		if derivPath.Account != 0 || derivPath.Branch != 0 {
+		if derivPath.Account != 0 {
 			return nil, fmt.Errorf(
-				"remotesigner can't sign input %d with DerivationPath %v",
-				ndx, derivPath)
+				"remotesigner can't sign input %d with Account %d",
+				ndx, derivPath.Account)
 		}
 
 		inputDescs = append(inputDescs, &InputDescriptor{
-			KeyLoc: &KeyLocator{KeyIndex: int32(derivPath.Index)},
+			KeyLoc: &KeyLocator{KeyPath: []uint32{derivPath.Branch, derivPath.Index}},
 			PrevOutput: &TxOut{
 				ValueSat: desc.Output.Value,
 				// PkScript: desc.Output.PkScript, // FIXME - not set in c-lightning?

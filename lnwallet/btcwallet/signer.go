@@ -1,7 +1,6 @@
 package btcwallet
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
