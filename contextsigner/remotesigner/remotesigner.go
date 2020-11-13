@@ -22,6 +22,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	requestTimeout = 10 * time.Second
+)
+
 type TxInResolver interface {
 	ResolveDerivation(
 		signDesc *input.SignDescriptor,
@@ -71,7 +75,7 @@ func (rsi *RemoteSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 		return [32]byte{}, fmt.Errorf("remotesigner nodeID not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.ECDH(ctx, &ECDHRequest{
@@ -81,7 +85,7 @@ func (rsi *RemoteSigner) ECDH(pubKey *btcec.PublicKey) ([32]byte, error) {
 	if err != nil {
 		// We need to log the error here because it seems callers don't
 		// get this error into the log.
-		log.Errorf("RemoteSigner.ECDH failed: %v", err)
+		log.Errorf("ECDH failed: %v", err)
 		return [32]byte{}, err
 	}
 
@@ -96,7 +100,7 @@ func (rsi *RemoteSigner) SignNodeAnnouncement(
 	if rsi.nodeID == nil {
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.SignNodeAnnouncement(ctx,
@@ -116,7 +120,7 @@ func (rsi *RemoteSigner) SignChannelUpdate(
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.SignChannelUpdate(ctx,
@@ -145,7 +149,7 @@ func (rsi *RemoteSigner) SignInvoice(
 	toSign := append([]byte(hrp), taggedFieldsBytes...)
 	hash := chainhash.HashB(toSign)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.SignInvoice(ctx,
@@ -168,7 +172,7 @@ func (rsi *RemoteSigner) SignMessage(
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	// The remotesigner will prefix the data with the standard prefix
@@ -210,7 +214,7 @@ func (rsi *RemoteSigner) InitNode(shadowSeed []byte) error {
 		return fmt.Errorf("InitNode called with shadowSeed unset")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.Init(ctx, &InitRequest{
@@ -262,7 +266,7 @@ func (rsi *RemoteSigner) NewChannel(
 
 	channelNonceInitial := channelNonceInitial(peerNode, pendingChanID)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	_, err := rsi.client.NewChannel(ctx,
@@ -274,7 +278,7 @@ func (rsi *RemoteSigner) NewChannel(
 		return nil, err
 	}
 
-	// ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	// ctx, cancel = context.WithTimeout(context.Background(), requestTimeout)
 	// defer cancel()
 
 	rsp, err := rsi.client.GetChannelBasepoints(ctx,
@@ -407,7 +411,7 @@ func (rsi *RemoteSigner) ReadyChannel(
 		commitmentType = ReadyChannelRequest_LEGACY
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	_, err := rsi.client.ReadyChannel(ctx,
@@ -465,7 +469,7 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	var rawTxBytes bytes.Buffer
@@ -506,6 +510,8 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 			},
 		})
 	if err != nil {
+		log.Debugf("rsp=%s err=%s", spew.Sdump(rsp), spew.Sdump(err))
+		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
 		return nil, err
 	}
 
@@ -526,7 +532,7 @@ func (rsi *RemoteSigner) SignFundingTx(
 		return nil, fmt.Errorf("remotesigner nodeID not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	fundingOutpoint := &wire.OutPoint{
@@ -623,7 +629,7 @@ func (rsi *RemoteSigner) SignChannelAnnouncement(
 	localFundingKey *btcec.PublicKey,
 	dataToSign []byte,
 ) (input.Signature, input.Signature, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	rsp, err := rsi.client.SignChannelAnnouncement(ctx,
