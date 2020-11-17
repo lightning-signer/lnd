@@ -548,7 +548,7 @@ type commitment struct {
 	incomingHTLCIndex map[int32]*PaymentDescriptor
 
 	// A map of pkscript to redeem script, needed for contextual signing.
-	witscriptMap map[[32]byte][]byte
+	redeemScriptMap input.RedeemScriptMap
 }
 
 // locateOutputIndex is a small helper function to locate the output index of a
@@ -2596,7 +2596,7 @@ func (lc *LightningChannel) fetchCommitmentView(remoteChain bool,
 	feePerKw := filteredHTLCView.feePerKw
 
 	// Actually generate unsigned commitment transaction for this view.
-	commitTx, witscriptMap, err := lc.commitBuilder.createUnsignedCommitmentTx(
+	commitTx, redeemScriptMap, err := lc.commitBuilder.createUnsignedCommitmentTx(
 		ourBalance, theirBalance, !remoteChain, feePerKw, nextHeight,
 		filteredHTLCView, keyRing,
 	)
@@ -2642,7 +2642,7 @@ func (lc *LightningChannel) fetchCommitmentView(remoteChain bool,
 		feePerKw:          feePerKw,
 		dustLimit:         dustLimit,
 		isOurs:            !remoteChain,
-		witscriptMap:      witscriptMap,
+		redeemScriptMap:   redeemScriptMap,
 	}
 
 	// In order to ensure _none_ of the HTLC's associated with this new
@@ -3613,7 +3613,7 @@ func (lc *LightningChannel) SignNextCommitment() (lnwire.Sig, []lnwire.Sig, []ch
 		int64(lc.channelState.Capacity),
 		lc.channelState.RemoteNextRevocation,
 		newCommitView.txn,
-		newCommitView.witscriptMap,
+		newCommitView.redeemScriptMap,
 	)
 	if err != nil {
 		close(cancelChan)
@@ -5307,7 +5307,7 @@ func (lc *LightningChannel) getSignedCommitTx() (*wire.MsgTx, error) {
 	// 	lc.channelState.RemoteChanCfg.MultiSigKey,
 	// 	int64(lc.channelState.Capacity),
 	// 	commitTx,
-	// 	witscriptMap,
+	// 	redeemScriptMap,
 	// )
 	lc.signDesc.SigHashes = txscript.NewTxSigHashes(commitTx)
 	ourSig, err := lc.Signer.Hack().SignOutputRaw(commitTx, lc.signDesc)

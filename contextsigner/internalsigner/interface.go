@@ -178,7 +178,7 @@ func (is *InternalSigner) SignRemoteCommitment(
 	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
-	theirWitscriptMap map[[32]byte][]byte,
+	theirRedeemScriptMap input.RedeemScriptMap,
 ) (input.Signature, error) {
 	fundingWitnessScript, fundingOutput, err := input.GenFundingPkScript(
 		localMultiSigKey.PubKey.SerializeCompressed(),

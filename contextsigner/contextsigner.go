@@ -82,7 +82,7 @@ type ChannelContextSigner interface {
 		channelValueSat int64,
 		remotePerCommitPoint *btcec.PublicKey,
 		theirCommitTx *wire.MsgTx,
-		theirWitscriptMap map[[32]byte][]byte,
+		theirRedeemScriptMap input.RedeemScriptMap,
 	) (input.Signature, error)
 
 	// Generate our signatures for the funding transaction.

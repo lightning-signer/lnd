@@ -396,9 +396,9 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	theirBalance lnwire.MilliSatoshi, isOurs bool,
 	feePerKw chainfee.SatPerKWeight, height uint64,
 	filteredHTLCView *htlcView,
-	keyRing *CommitmentKeyRing) (*unsignedCommitmentTx, map[[32]byte][]byte, error) {
+	keyRing *CommitmentKeyRing) (*unsignedCommitmentTx, input.RedeemScriptMap, error) {
 	// We need to return a map of pkscript to redeem script,
-	var witscriptMap map[[32]byte][]byte
+	var redeemScriptMap input.RedeemScriptMap
 
 	dustLimit := cb.chanState.LocalChanCfg.DustLimit
 	if !isOurs {
@@ -467,14 +467,14 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 	// a new commitment transaction with all the latest unsettled/un-timed
 	// out HTLCs.
 	if isOurs {
-		commitTx, witscriptMap, err = CreateCommitTx(
+		commitTx, redeemScriptMap, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.LocalChanCfg, &cb.chanState.RemoteChanCfg,
 			ourBalance.ToSatoshis(), theirBalance.ToSatoshis(),
 			numHTLCs,
 		)
 	} else {
-		commitTx, witscriptMap, err = CreateCommitTx(
+		commitTx, redeemScriptMap, err = CreateCommitTx(
 			cb.chanState.ChanType, fundingTxIn(cb.chanState), keyRing,
 			&cb.chanState.RemoteChanCfg, &cb.chanState.LocalChanCfg,
 			theirBalance.ToSatoshis(), ourBalance.ToSatoshis(),
@@ -569,7 +569,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 		ourBalance:   ourBalance,
 		theirBalance: theirBalance,
 		cltvs:        cltvs,
-	}, witscriptMap, nil
+	}, redeemScriptMap, nil
 }
 
 // CreateCommitTx creates a commitment transaction, spending from specified
@@ -582,17 +582,10 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 	fundingOutput wire.TxIn, keyRing *CommitmentKeyRing,
 	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
 	amountToLocal, amountToRemote btcutil.Amount,
-	numHTLCs int64) (*wire.MsgTx, map[[32]byte][]byte, error) {
+	numHTLCs int64) (*wire.MsgTx, input.RedeemScriptMap, error) {
 
 	// We need to return a map of pkscript to redeem script,
-	witscriptMap := make(map[[32]byte][]byte)
-
-	// A Slice to byte array helper so we can use the map.
-	s2a := func(slice []byte) [32]byte {
-		var hash [32]byte
-		copy(hash[:], slice)
-		return hash
-	}
+	redeemScriptMap := make(input.RedeemScriptMap)
 
 	// First, we create the script for the delayed "pay-to-self" output.
 	// This output has 2 main redemption clauses: either we can redeem the
@@ -634,7 +627,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 			PkScript: toLocalScriptHash,
 			Value:    int64(amountToLocal),
 		})
-		witscriptMap[s2a(toLocalScriptHash)] = toLocalRedeemScript
+		redeemScriptMap.Insert(toLocalScriptHash, toLocalRedeemScript)
 	}
 
 	remoteOutput := amountToRemote >= localChanCfg.DustLimit
@@ -643,8 +636,8 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 			PkScript: toRemoteScript.PkScript,
 			Value:    int64(amountToRemote),
 		})
-		witscriptMap[s2a(toRemoteScript.PkScript)] =
-			toRemoteScript.WitnessScript
+		redeemScriptMap.Insert(toRemoteScript.PkScript,
+			toRemoteScript.WitnessScript)
 	}
 
 	// If this channel type has anchors, we'll also add those.
@@ -663,7 +656,7 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 				PkScript: localAnchor.PkScript,
 				Value:    int64(anchorSize),
 			})
-			witscriptMap[s2a(localAnchor.PkScript)] = localAnchor.WitnessScript
+			redeemScriptMap.Insert(localAnchor.PkScript, localAnchor.WitnessScript)
 		}
 		// Add anchor output to remote only if they have a commitment
 		// output or there are HTLCs.
@@ -672,12 +665,12 @@ func CreateCommitTx(chanType channeldb.ChannelType,
 				PkScript: remoteAnchor.PkScript,
 				Value:    int64(anchorSize),
 			})
-			witscriptMap[s2a(remoteAnchor.PkScript)] =
-				remoteAnchor.WitnessScript
+			redeemScriptMap.Insert(remoteAnchor.PkScript,
+				remoteAnchor.WitnessScript)
 		}
 	}
 
-	return commitTx, witscriptMap, nil
+	return commitTx, redeemScriptMap, nil
 }
 
 // CoopCloseBalance returns the final balances that should be used to create
