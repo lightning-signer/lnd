@@ -310,7 +310,7 @@ func (ss *shadowSigner) SignRemoteCommitment(
 	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
-	theirWitscriptMap map[[32]byte][]byte,
+	theirRedeemScriptMap input.RedeemScriptMap,
 ) (input.Signature, error) {
 	var err error
 	sig0, err := ss.internalSigner.SignRemoteCommitment(
@@ -320,7 +320,7 @@ func (ss *shadowSigner) SignRemoteCommitment(
 		channelValueSat,
 		remotePerCommitPoint,
 		theirCommitTx,
-		theirWitscriptMap,
+		theirRedeemScriptMap,
 	)
 	if err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func (ss *shadowSigner) SignRemoteCommitment(
 		channelValueSat,
 		remotePerCommitPoint,
 		theirCommitTx,
-		theirWitscriptMap,
+		theirRedeemScriptMap,
 	)
 	if err != nil {
 		return nil, err

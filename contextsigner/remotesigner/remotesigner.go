@@ -13,11 +13,9 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 	"github.com/btcsuite/btcwallet/waddrmgr"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contextsigner"
 	"github.com/lightningnetwork/lnd/input"
 	"github.com/lightningnetwork/lnd/keychain"
-	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"google.golang.org/grpc"
 )
@@ -463,7 +461,7 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	channelValueSat int64,
 	remotePerCommitPoint *btcec.PublicKey,
 	theirCommitTx *wire.MsgTx,
-	theirWitscriptMap map[[32]byte][]byte,
+	theirRedeemScriptMap input.RedeemScriptMap,
 ) (input.Signature, error) {
 	if rsi.nodeID == nil {
 		return nil, fmt.Errorf("remotesigner nodeID not set")
@@ -489,10 +487,8 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	})
 	var outputDescs []*OutputDescriptor
 	for _, txi := range theirCommitTx.TxOut {
-		var pkscript [32]byte
-		copy(pkscript[:], txi.PkScript)
 		outputDescs = append(outputDescs, &OutputDescriptor{
-			Witscript: theirWitscriptMap[pkscript],
+			Witscript: theirRedeemScriptMap.Lookup(txi.PkScript),
 		})
 	}
 
@@ -510,7 +506,6 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 			},
 		})
 	if err != nil {
-		log.Debugf("rsp=%s err=%s", spew.Sdump(rsp), spew.Sdump(err))
 		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
 		return nil, err
 	}
@@ -662,81 +657,6 @@ func channelNonceInitial(peerNode *btcec.PublicKey,
 	retval = append(retval, pendingChanID[:]...)
 	log.Debugf("channelNonceInitial: %s", hex.EncodeToString(retval))
 	return retval
-}
-
-// The remotesigner needs the witness script to properly validate the
-// the transaction.  This helper returns an array of witness scripts
-// one for each of the outputs of the transaction.
-func generateRemoteCommitmentWitnessScripts(
-	theirCommitPoint *btcec.PublicKey,
-	chanType channeldb.ChannelType,
-	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
-	theirCommitTx *wire.MsgTx) ([][]byte, error) {
-
-	// A Slice to byte array helper so we can use a map.
-	s2a := func(slice []byte) [32]byte {
-		var hash [32]byte
-		copy(hash[:], slice)
-		return hash
-	}
-
-	// Since the outputs are not in a particular order we will need
-	// to match the witscripts by their pk_hash values.
-	witscriptMap := make(map[[32]byte][]byte)
-
-	remoteCommitmentKeys := lnwallet.DeriveCommitmentKeys(
-		theirCommitPoint,
-		false,
-		chanType,
-		localChanCfg,
-		remoteChanCfg,
-	)
-
-	// Derive the to_self output witscript and hash.
-	toLocalRedeemScript, err := input.CommitScriptToSelf(
-		uint32(remoteChanCfg.CsvDelay),
-		remoteCommitmentKeys.ToLocalKey,
-		remoteCommitmentKeys.RevocationKey,
-	)
-	if err != nil {
-		return nil, err
-	}
-	toLocalScriptHash, err := input.WitnessScriptHash(
-		toLocalRedeemScript,
-	)
-	if err != nil {
-		return nil, err
-	}
-	witscriptMap[s2a(toLocalScriptHash)] = toLocalRedeemScript
-
-	// Derive the to_remote output witscript and hash.
-	toRemoteScript, _, err := lnwallet.CommitScriptToRemote(
-		chanType, remoteCommitmentKeys.ToRemoteKey,
-	)
-	if err != nil {
-		return nil, err
-	}
-	witscriptMap[s2a(toRemoteScript.PkScript)] = toRemoteScript.WitnessScript
-
-	// Add any anchor witscripts and hashes..
-	if chanType.HasAnchors() {
-		localAnchor, remoteAnchor, err := lnwallet.CommitScriptAnchors(
-			localChanCfg, remoteChanCfg,
-		)
-		if err != nil {
-			return nil, err
-		}
-		witscriptMap[s2a(localAnchor.PkScript)] = localAnchor.WitnessScript
-		witscriptMap[s2a(remoteAnchor.PkScript)] = remoteAnchor.WitnessScript
-	}
-
-	// Scan the transaction, return the witness script for the
-	// matching outputs and []byte{} placeholders for the others.
-	var witscripts [][]byte
-	for _, txi := range theirCommitTx.TxOut {
-		witscripts = append(witscripts, witscriptMap[s2a(txi.PkScript)])
-	}
-	return witscripts, nil
 }
 
 // The remotesigner uses <R><S><recovery-id>, lnd uses <(byte of
