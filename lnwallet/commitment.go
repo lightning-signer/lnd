@@ -505,7 +505,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 
 		err := addHTLC(
 			commitTx, isOurs, false, htlc, keyRing,
-			cb.chanState.ChanType,
+			cb.chanState.ChanType, redeemScriptMap,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -522,7 +522,7 @@ func (cb *CommitmentBuilder) createUnsignedCommitmentTx(ourBalance,
 
 		err := addHTLC(
 			commitTx, isOurs, true, htlc, keyRing,
-			cb.chanState.ChanType,
+			cb.chanState.ChanType, redeemScriptMap,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -795,7 +795,8 @@ func genHtlcScript(chanType channeldb.ChannelType, isIncoming, ourCommit bool,
 // the descriptor itself.
 func addHTLC(commitTx *wire.MsgTx, ourCommit bool,
 	isIncoming bool, paymentDesc *PaymentDescriptor,
-	keyRing *CommitmentKeyRing, chanType channeldb.ChannelType) error {
+	keyRing *CommitmentKeyRing, chanType channeldb.ChannelType,
+	redeemScriptMap input.RedeemScriptMap) error {
 
 	timeout := paymentDesc.Timeout
 	rHash := paymentDesc.RHash
@@ -806,6 +807,7 @@ func addHTLC(commitTx *wire.MsgTx, ourCommit bool,
 	if err != nil {
 		return err
 	}
+	redeemScriptMap.Insert(p2wsh, witnessScript)
 
 	// Add the new HTLC outputs to the respective commitment transactions.
 	amountPending := int64(paymentDesc.Amount.ToSatoshis())
