@@ -353,22 +353,38 @@ func (b *BtcWallet) ComputeInputScript(tx *wire.MsgTx,
 }
 
 func (b *BtcWallet) ResolveDerivation(signDesc *input.SignDescriptor) (
-	waddrmgr.KeyScope, waddrmgr.DerivationPath, error) {
+	waddrmgr.KeyScope, waddrmgr.DerivationPath, waddrmgr.AddressType, error) {
 
 	outputScript := signDesc.Output.PkScript
 	walletAddr, err := b.fetchOutputAddr(outputScript)
 	if err != nil {
-		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{}, err
+		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{}, 0, err
 	}
 
 	pka := walletAddr.(waddrmgr.ManagedPubKeyAddress)
 	keyScope, derivPath, ok := pka.DerivationInfo()
 	if !ok {
-		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{},
+		return waddrmgr.KeyScope{}, waddrmgr.DerivationPath{}, 0,
 			fmt.Errorf("Cannot provide address derivation")
 	}
 
-	return keyScope, derivPath, nil
+	return keyScope, derivPath, pka.AddrType(), nil
+}
+
+func (b *BtcWallet) LookupClosedChannelPoint(outpoint *wire.OutPoint) (
+	*wire.OutPoint, error) {
+	// We manually look up the output within the tx store.
+	txid := &outpoint.Hash
+	txDetail, err := base.UnstableAPI(b.wallet).TxDetails(txid)
+	if err != nil {
+		return nil, err
+	} else if txDetail == nil {
+		return nil, lnwallet.ErrNotMine
+	}
+	if len(txDetail.TxRecord.MsgTx.TxIn) != 1 {
+		return nil, fmt.Errorf("Unexpected unilateral close tx format")
+	}
+	return &txDetail.TxRecord.MsgTx.TxIn[0].PreviousOutPoint, nil
 }
 
 // A compile time check to ensure that BtcWallet implements the Signer

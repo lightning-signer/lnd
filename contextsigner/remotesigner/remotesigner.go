@@ -27,7 +27,11 @@ const (
 type TxInResolver interface {
 	ResolveDerivation(
 		signDesc *input.SignDescriptor,
-	) (waddrmgr.KeyScope, waddrmgr.DerivationPath, error)
+	) (waddrmgr.KeyScope, waddrmgr.DerivationPath, waddrmgr.AddressType, error)
+
+	// Finds the channel outpoint for a utxo from a unilaterally closed channel.
+	LookupClosedChannelPoint(outpoint *wire.OutPoint,
+	) (*wire.OutPoint, error)
 }
 
 type RemoteSigner struct {
@@ -544,38 +548,68 @@ func (rsi *RemoteSigner) SignFundingTx(
 
 	var inputDescs []*InputDescriptor
 	for ndx, txi := range fundingTx.TxIn {
-		log.Debugf("txi[%d]: %v", ndx, spew.Sdump(txi))
 		desc := signDescs[ndx]
 
-		keyScope, derivPath, err := rsi.txInResolver.ResolveDerivation(desc)
+		keyScope, derivPath, addrType, err :=
+			rsi.txInResolver.ResolveDerivation(desc)
 		if err != nil {
 			return nil, err
 		}
-		if keyScope.Purpose != 84 || keyScope.Coin != 0 {
-			return nil, fmt.Errorf(
-				"remotesigner can't sign input %d with KeyScope %v",
-				ndx, keyScope)
-		}
-		if derivPath.Account != 0 {
-			return nil, fmt.Errorf(
-				"remotesigner can't sign input %d with Account %d",
-				ndx, derivPath.Account)
+
+		spendType := SpendType_INVALID
+		switch addrType {
+		case waddrmgr.WitnessPubKey:
+			spendType = SpendType_P2WPKH
+		case waddrmgr.NestedWitnessPubKey:
+			spendType = SpendType_P2SH_P2WPKH
 		}
 
-		inputDescs = append(inputDescs, &InputDescriptor{
-			KeyLoc: &KeyLocator{KeyPath: []uint32{derivPath.Branch, derivPath.Index}},
-			PrevOutput: &TxOut{
-				ValueSat: desc.Output.Value,
-				// PkScript: desc.Output.PkScript, // FIXME - not set in c-lightning?
-			},
-			SpendType: SpendType_P2WPKH, // FIXME - make dynamic
-			// FIXME - how to figure this out?
-			// CloseInfo: &CloseInfo{
-			//     ChanneNonce:  &ChannelNonce{Data: peerChanID[:]},
-			//     CommitmentPoint: maybeCommitmentPoint,
-			// },
-			RedeemScript: desc.WitnessScript, // FIXME - not set in c-lightning?
-		})
+		// Is this input from the wallet account?
+		if keyScope.Purpose == 84 || keyScope.Coin == 0 {
+			if derivPath.Account != 0 {
+				return nil, fmt.Errorf(
+					"remotesigner can't sign input %d with Account %d",
+					ndx, derivPath.Account)
+			}
+			// This UTXO is from the wallet. Build an InputDescriptor
+			// describing the wallet UTXO.
+			inputDescs = append(inputDescs, &InputDescriptor{
+				KeyLoc: &KeyLocator{
+					KeyPath: []uint32{
+						derivPath.Branch,
+						derivPath.Index,
+					},
+				},
+				PrevOutput: &TxOut{
+					ValueSat: desc.Output.Value,
+				},
+				SpendType: spendType,
+			})
+		} else {
+			// This might be the UTXO from a unilaterally closed channel.
+			// See if we can lookup the closed channel outpoint.
+			closedChanOutpoint, err :=
+				rsi.txInResolver.LookupClosedChannelPoint(&txi.PreviousOutPoint)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"remotesigner can't sign input %d with KeyScope %v",
+					ndx, keyScope)
+			}
+			// Build an InputDescriptor describing the UTXO from the
+			// unilaterally closed channel.
+			closedChanID := lnwire.NewChanIDFromOutPoint(closedChanOutpoint)
+			inputDescs = append(inputDescs, &InputDescriptor{
+				KeyLoc: &KeyLocator{
+					CloseInfo: &UnilateralCloseInfo{
+						ChannelNonce: &ChannelNonce{Data: closedChanID[:]},
+					},
+				},
+				PrevOutput: &TxOut{
+					ValueSat: desc.Output.Value,
+				},
+				SpendType: spendType,
+			})
+		}
 	}
 
 	rsp, err := rsi.client.SignFundingTx(ctx,
