@@ -485,9 +485,7 @@ func (rsi *RemoteSigner) SignRemoteCommitment(
 	}
 	var inputDescs []*InputDescriptor
 	inputDescs = append(inputDescs, &InputDescriptor{
-		PrevOutput: &TxOut{
-			ValueSat: int64(channelValueSat),
-		},
+		ValueSat: int64(channelValueSat),
 	})
 	var outputDescs []*OutputDescriptor
 	for _, txi := range theirCommitTx.TxOut {
@@ -580,9 +578,7 @@ func (rsi *RemoteSigner) SignFundingTx(
 						derivPath.Index,
 					},
 				},
-				PrevOutput: &TxOut{
-					ValueSat: desc.Output.Value,
-				},
+				ValueSat:  desc.Output.Value,
 				SpendType: spendType,
 			})
 		} else {
@@ -604,9 +600,7 @@ func (rsi *RemoteSigner) SignFundingTx(
 						ChannelNonce: &ChannelNonce{Data: closedChanID[:]},
 					},
 				},
-				PrevOutput: &TxOut{
-					ValueSat: desc.Output.Value,
-				},
+				ValueSat:  desc.Output.Value,
 				SpendType: spendType,
 			})
 		}
