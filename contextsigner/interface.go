@@ -74,8 +74,14 @@ type ChannelContextSigner interface {
 		isTweakless bool,
 	) error
 
+	// Generate our signatures for the funding transaction.
+	SignFundingTx(
+		signDescs []*input.SignDescriptor,
+		fundingTx *wire.MsgTx,
+	) ([]*input.Script, error)
+
 	// Generate our signature for the peer's commitment transaction.
-	SignRemoteCommitment(
+	SignRemoteCommitmentTx(
 		chanID lnwire.ChannelID,
 		localMultiSigKey keychain.KeyDescriptor,
 		remoteMultiSigKey keychain.KeyDescriptor,
@@ -85,11 +91,13 @@ type ChannelContextSigner interface {
 		theirRedeemScriptMap input.RedeemScriptMap,
 	) (input.Signature, error)
 
-	// Generate our signatures for the funding transaction.
-	SignFundingTx(
-		signDescs []*input.SignDescriptor,
-		fundingTx *wire.MsgTx,
-	) ([]*input.Script, error)
+	// Generate our signature for the peer's htlc transactions.
+	SignRemoteHTLCTx(
+		chanID lnwire.ChannelID,
+		signDesc *input.SignDescriptor,
+		commitPoint *btcec.PublicKey,
+		theirTx *wire.MsgTx,
+	) (input.Signature, error)
 
 	// Generate the both the node signature and the bitcoin (funding)
 	// signature for the channel announcement.

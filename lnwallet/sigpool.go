@@ -87,6 +87,10 @@ type SignJob struct {
 	// transaction being signed.
 	OutputIndex int32
 
+	// Addtionally needed to use ContextSigning.
+	ChanPoint   *wire.OutPoint
+	CommitPoint *btcec.PublicKey
+
 	// Cancel is a channel that should be closed if the caller wishes to
 	// abandon all pending sign jobs part of a single batch.
 	Cancel chan struct{}
@@ -189,8 +193,11 @@ func (s *SigPool) poolWorker() {
 		// send the result along with a possible error back to the
 		// caller.
 		case sigMsg := <-s.signJobs:
-			rawSig, err := s.signer.Hack().SignOutputRaw(
-				sigMsg.Tx, &sigMsg.SignDesc,
+			rawSig, err := s.signer.SignRemoteHTLCTx(
+				lnwire.NewChanIDFromOutPoint(sigMsg.ChanPoint),
+				&sigMsg.SignDesc,
+				sigMsg.CommitPoint,
+				sigMsg.Tx,
 			)
 			if err != nil {
 				select {

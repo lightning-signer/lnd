@@ -1238,7 +1238,7 @@ func (l *LightningWallet) handleChanPointReady(req *continueContributionMsg) {
 	chanState.LocalCommitment.CommitTx = ourCommitTx
 	chanState.RemoteCommitment.CommitTx = theirCommitTx
 
-	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitment(
+	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitmentTx(
 		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
 		ourContribution.MultiSigKey,
 		theirContribution.MultiSigKey,
@@ -1626,7 +1626,7 @@ func (l *LightningWallet) handleSingleFunderSigs(req *addSingleFunderSigsMsg) {
 	// With their signature for our version of the commitment transactions
 	// verified, we can now generate a signature for their version,
 	// allowing the funding transaction to be safely broadcast.
-	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitment(
+	sigTheirCommit, err := l.Cfg.Signer.SignRemoteCommitmentTx(
 		lnwire.NewChanIDFromOutPoint(&chanState.FundingOutpoint),
 		ourKey,
 		theirKey,

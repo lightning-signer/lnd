@@ -171,7 +171,33 @@ func (is *InternalSigner) ReadyChannel(
 	return nil
 }
 
-func (is *InternalSigner) SignRemoteCommitment(
+func (is *InternalSigner) SignFundingTx(
+	signDescs []*input.SignDescriptor,
+	fundingTx *wire.MsgTx,
+) ([]*input.Script, error) {
+	scripts := []*input.Script{}
+	for i, _ := range fundingTx.TxIn {
+		// Skip if this input isn't ours.
+		if signDescs[i] == nil {
+			scripts = append(scripts, nil)
+			continue
+		}
+
+		// Finally, we'll sign the input as is, and populate the input
+		// with the witness and sigScript (if needed).
+		inputScript, err := is.signer.ComputeInputScript(
+			fundingTx, signDescs[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		scripts = append(scripts, inputScript)
+	}
+	return scripts, nil
+}
+
+func (is *InternalSigner) SignRemoteCommitmentTx(
 	chanID lnwire.ChannelID,
 	localMultiSigKey keychain.KeyDescriptor,
 	remoteMultiSigKey keychain.KeyDescriptor,
@@ -202,30 +228,13 @@ func (is *InternalSigner) SignRemoteCommitment(
 	return is.signer.SignOutputRaw(theirCommitTx, &signDesc)
 }
 
-func (is *InternalSigner) SignFundingTx(
-	signDescs []*input.SignDescriptor,
-	fundingTx *wire.MsgTx,
-) ([]*input.Script, error) {
-	scripts := []*input.Script{}
-	for i, _ := range fundingTx.TxIn {
-		// Skip if this input isn't ours.
-		if signDescs[i] == nil {
-			scripts = append(scripts, nil)
-			continue
-		}
-
-		// Finally, we'll sign the input as is, and populate the input
-		// with the witness and sigScript (if needed).
-		inputScript, err := is.signer.ComputeInputScript(
-			fundingTx, signDescs[i],
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		scripts = append(scripts, inputScript)
-	}
-	return scripts, nil
+func (is *InternalSigner) SignRemoteHTLCTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	commitPoint *btcec.PublicKey,
+	theirTx *wire.MsgTx,
+) (input.Signature, error) {
+	return is.signer.SignOutputRaw(theirTx, signDesc)
 }
 
 func (is *InternalSigner) SignChannelAnnouncement(

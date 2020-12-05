@@ -64,7 +64,15 @@ func (ms *MockChannelContextSigner) ReadyChannel(
 		"ReadyChannel")
 }
 
-func (ms *MockChannelContextSigner) SignRemoteCommitment(
+func (ms *MockChannelContextSigner) SignFundingTx(
+	signDescs []*input.SignDescriptor,
+	fundingTx *wire.MsgTx,
+) ([]*input.Script, error) {
+	return nil, fmt.Errorf("MockChannelContextSigner unimplemented " +
+		"SignFundingTx")
+}
+
+func (ms *MockChannelContextSigner) SignRemoteCommitmentTx(
 	chanID lnwire.ChannelID,
 	localMultiSigKey keychain.KeyDescriptor,
 	remoteMultiSigKey keychain.KeyDescriptor,
@@ -95,12 +103,13 @@ func (ms *MockChannelContextSigner) SignRemoteCommitment(
 	return ms.signer.SignOutputRaw(theirCommitTx, &signDesc)
 }
 
-func (ms *MockChannelContextSigner) SignFundingTx(
-	signDescs []*input.SignDescriptor,
-	fundingTx *wire.MsgTx,
-) ([]*input.Script, error) {
-	return nil, fmt.Errorf("MockChannelContextSigner unimplemented " +
-		"SignFundingTx")
+func (ms *MockChannelContextSigner) SignRemoteHTLCTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	commitPoint *btcec.PublicKey,
+	theirTx *wire.MsgTx,
+) (input.Signature, error) {
+	return ms.signer.SignOutputRaw(theirTx, signDesc)
 }
 
 func (ms *MockChannelContextSigner) SignChannelAnnouncement(

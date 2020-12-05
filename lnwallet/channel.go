@@ -2979,7 +2979,9 @@ func processFeeUpdate(feeUpdate *PaymentDescriptor, nextHeight uint64,
 func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 	chanType channeldb.ChannelType,
 	localChanCfg, remoteChanCfg *channeldb.ChannelConfig,
-	remoteCommitView *commitment) ([]SignJob, chan struct{}, error) {
+	remoteCommitView *commitment,
+	chanPoint *wire.OutPoint,
+) ([]SignJob, chan struct{}, error) {
 
 	txHash := remoteCommitView.txn.TxHash()
 	dustLimit := remoteChanCfg.DustLimit
@@ -3051,6 +3053,8 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			InputIndex: 0,
 		}
 		sigJob.OutputIndex = htlc.remoteOutputIndex
+		sigJob.ChanPoint = chanPoint
+		sigJob.CommitPoint = keyRing.CommitPoint
 
 		sigBatch = append(sigBatch, sigJob)
 	}
@@ -3104,6 +3108,8 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			InputIndex: 0,
 		}
 		sigJob.OutputIndex = htlc.remoteOutputIndex
+		sigJob.ChanPoint = chanPoint
+		sigJob.CommitPoint = keyRing.CommitPoint
 
 		sigBatch = append(sigBatch, sigJob)
 	}
@@ -3595,7 +3601,7 @@ func (lc *LightningChannel) SignNextCommitment() (lnwire.Sig, []lnwire.Sig, []ch
 	sigBatch, cancelChan, err := genRemoteHtlcSigJobs(
 		keyRing, lc.channelState.ChanType,
 		&lc.channelState.LocalChanCfg, &lc.channelState.RemoteChanCfg,
-		newCommitView,
+		newCommitView, lc.ChanPoint,
 	)
 	if err != nil {
 		return sig, htlcSigs, nil, err
@@ -3606,7 +3612,7 @@ func (lc *LightningChannel) SignNextCommitment() (lnwire.Sig, []lnwire.Sig, []ch
 	// the new commitment transaction while we're waiting for the rest of
 	// the HTLC signatures to be processed.
 	lc.signDesc.SigHashes = txscript.NewTxSigHashes(newCommitView.txn)
-	rawSig, err := lc.Signer.SignRemoteCommitment(
+	rawSig, err := lc.Signer.SignRemoteCommitmentTx(
 		lnwire.NewChanIDFromOutPoint(lc.ChanPoint),
 		lc.channelState.LocalChanCfg.MultiSigKey,
 		lc.channelState.RemoteChanCfg.MultiSigKey,
