@@ -458,66 +458,6 @@ func (rsi *RemoteSigner) ReadyChannel(
 	return nil
 }
 
-func (rsi *RemoteSigner) SignRemoteCommitment(
-	chanID lnwire.ChannelID,
-	localMultiSigKey keychain.KeyDescriptor,
-	remoteMultiSigKey keychain.KeyDescriptor,
-	channelValueSat int64,
-	remotePerCommitPoint *btcec.PublicKey,
-	theirCommitTx *wire.MsgTx,
-	theirRedeemScriptMap input.RedeemScriptMap,
-) (input.Signature, error) {
-	if rsi.nodeID == nil {
-		return nil, fmt.Errorf("remotesigner nodeID not set")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var rawTxBytes bytes.Buffer
-	err := theirCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(theirCommitTx.TxIn) != 1 {
-		return nil, fmt.Errorf("commitment tx must have one input")
-	}
-	var inputDescs []*InputDescriptor
-	inputDescs = append(inputDescs, &InputDescriptor{
-		ValueSat: int64(channelValueSat),
-	})
-	var outputDescs []*OutputDescriptor
-	for _, txi := range theirCommitTx.TxOut {
-		outputDescs = append(outputDescs, &OutputDescriptor{
-			Witscript: theirRedeemScriptMap.Lookup(txi.PkScript),
-		})
-	}
-
-	rsp, err := rsi.client.SignRemoteCommitmentTx(ctx,
-		&SignRemoteCommitmentTxRequest{
-			NodeId:       &NodeId{Data: rsi.nodeID[:]},
-			ChannelNonce: &ChannelNonce{Data: chanID[:]},
-			RemotePerCommitPoint: &PubKey{
-				Data: remotePerCommitPoint.SerializeCompressed(),
-			},
-			Tx: &Transaction{
-				RawTxBytes:  rawTxBytes.Bytes(),
-				InputDescs:  inputDescs,
-				OutputDescs: outputDescs,
-			},
-		})
-	if err != nil {
-		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
-		return nil, err
-	}
-
-	sig := rsp.Signature.Data
-
-	// Chop off the sighash flag at the end of the signature.
-	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
-}
-
 func (rsi *RemoteSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	multiSigIndex uint32,
@@ -645,6 +585,126 @@ func (rsi *RemoteSigner) SignFundingTx(
 		}
 	}
 	return scripts, nil
+}
+
+func (rsi *RemoteSigner) SignRemoteCommitmentTx(
+	chanID lnwire.ChannelID,
+	localMultiSigKey keychain.KeyDescriptor,
+	remoteMultiSigKey keychain.KeyDescriptor,
+	channelValueSat int64,
+	remotePerCommitPoint *btcec.PublicKey,
+	theirCommitTx *wire.MsgTx,
+	theirRedeemScriptMap input.RedeemScriptMap,
+) (input.Signature, error) {
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var rawTxBytes bytes.Buffer
+	err := theirCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(theirCommitTx.TxIn) != 1 {
+		return nil, fmt.Errorf("commitment tx must have one input")
+	}
+	var inputDescs []*InputDescriptor
+	inputDescs = append(inputDescs, &InputDescriptor{
+		ValueSat: int64(channelValueSat),
+	})
+	var outputDescs []*OutputDescriptor
+	for _, txi := range theirCommitTx.TxOut {
+		outputDescs = append(outputDescs, &OutputDescriptor{
+			Witscript: theirRedeemScriptMap.Lookup(txi.PkScript),
+		})
+	}
+
+	rsp, err := rsi.client.SignRemoteCommitmentTx(ctx,
+		&SignRemoteCommitmentTxRequest{
+			NodeId:       &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
+			RemotePerCommitPoint: &PubKey{
+				Data: remotePerCommitPoint.SerializeCompressed(),
+			},
+			Tx: &Transaction{
+				RawTxBytes:  rawTxBytes.Bytes(),
+				InputDescs:  inputDescs,
+				OutputDescs: outputDescs,
+			},
+		},
+	)
+	if err != nil {
+		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
+		return nil, err
+	}
+	sig := rsp.Signature.Data
+
+	// Chop off the sighash flag at the end of the signature.
+	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
+}
+
+func (rsi *RemoteSigner) SignRemoteHTLCTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	commitPoint *btcec.PublicKey,
+	theirTx *wire.MsgTx,
+	witnessScript []byte,
+) (input.Signature, error) {
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var rawTxBytes bytes.Buffer
+	err := theirTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(theirTx.TxIn) != 1 {
+		return nil, fmt.Errorf("htlc tx must have one input")
+	}
+	var inputDescs []*InputDescriptor
+	inputDescs = append(inputDescs, &InputDescriptor{
+		ValueSat:     signDesc.Output.Value,
+		RedeemScript: signDesc.WitnessScript,
+	})
+	if len(theirTx.TxOut) != 1 {
+		return nil, fmt.Errorf("htlc tx must have one output")
+	}
+	var outputDescs []*OutputDescriptor
+	outputDescs = append(outputDescs, &OutputDescriptor{
+		Witscript: witnessScript,
+	})
+
+	rsp, err := rsi.client.SignRemoteHTLCTx(ctx,
+		&SignRemoteHTLCTxRequest{
+			NodeId:       &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
+			Tx: &Transaction{
+				RawTxBytes:  rawTxBytes.Bytes(),
+				InputDescs:  inputDescs,
+				OutputDescs: outputDescs,
+			},
+			RemotePerCommitPoint: &PubKey{
+				Data: commitPoint.SerializeCompressed(),
+			},
+		},
+	)
+	if err != nil {
+		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
+		return nil, err
+	}
+	sig := rsp.Signature.Data
+
+	// Chop off the sighash flag at the end of the signature.
+	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
 }
 
 func (rsi *RemoteSigner) SignChannelAnnouncement(

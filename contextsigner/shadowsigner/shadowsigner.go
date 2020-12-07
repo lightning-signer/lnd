@@ -303,47 +303,6 @@ func (ss *shadowSigner) ReadyChannel(
 	return nil
 }
 
-func (ss *shadowSigner) SignRemoteCommitment(
-	chanID lnwire.ChannelID,
-	localMultiSigKey keychain.KeyDescriptor,
-	remoteMultiSigKey keychain.KeyDescriptor,
-	channelValueSat int64,
-	remotePerCommitPoint *btcec.PublicKey,
-	theirCommitTx *wire.MsgTx,
-	theirRedeemScriptMap input.RedeemScriptMap,
-) (input.Signature, error) {
-	var err error
-	sig0, err := ss.internalSigner.SignRemoteCommitment(
-		chanID,
-		localMultiSigKey,
-		remoteMultiSigKey,
-		channelValueSat,
-		remotePerCommitPoint,
-		theirCommitTx,
-		theirRedeemScriptMap,
-	)
-	if err != nil {
-		return nil, err
-	}
-	sig1, err := ss.remoteSigner.SignRemoteCommitment(
-		chanID,
-		localMultiSigKey,
-		remoteMultiSigKey,
-		channelValueSat,
-		remotePerCommitPoint,
-		theirCommitTx,
-		theirRedeemScriptMap,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if !reflect.DeepEqual(sig0, sig1) {
-		return nil, fmt.Errorf("ShadowSigner.SignRemoteCommitment mismatch: "+
-			"internal=%v remote=%v", sig0, sig1)
-	}
-	return sig1, nil
-}
-
 func (ss *shadowSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	multiSigIndex uint32,
@@ -365,6 +324,86 @@ func (ss *shadowSigner) SignFundingTx(
 			spew.Sdump(scripts0), spew.Sdump(scripts1))
 	}
 	return scripts1, nil
+}
+
+func (ss *shadowSigner) SignRemoteCommitmentTx(
+	chanID lnwire.ChannelID,
+	localMultiSigKey keychain.KeyDescriptor,
+	remoteMultiSigKey keychain.KeyDescriptor,
+	channelValueSat int64,
+	remotePerCommitPoint *btcec.PublicKey,
+	theirCommitTx *wire.MsgTx,
+	theirRedeemScriptMap input.RedeemScriptMap,
+) (input.Signature, error) {
+	sig0, err := ss.internalSigner.SignRemoteCommitmentTx(
+		chanID,
+		localMultiSigKey,
+		remoteMultiSigKey,
+		channelValueSat,
+		remotePerCommitPoint,
+		theirCommitTx,
+		theirRedeemScriptMap,
+	)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignRemoteCommitmentTx(
+		chanID,
+		localMultiSigKey,
+		remoteMultiSigKey,
+		channelValueSat,
+		remotePerCommitPoint,
+		theirCommitTx,
+		theirRedeemScriptMap,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignRemoteCommitmentTx mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(sig0.Serialize()),
+			hex.EncodeToString(sig1.Serialize()),
+		)
+	}
+	return sig1, nil
+}
+
+func (ss *shadowSigner) SignRemoteHTLCTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	commitPoint *btcec.PublicKey,
+	theirTx *wire.MsgTx,
+	witnessScript []byte,
+) (input.Signature, error) {
+	sig0, err := ss.internalSigner.SignRemoteHTLCTx(
+		chanID,
+		signDesc,
+		commitPoint,
+		theirTx,
+		witnessScript,
+	)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignRemoteHTLCTx(
+		chanID,
+		signDesc,
+		commitPoint,
+		theirTx,
+		witnessScript,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignRemoteHTLCTx mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(sig0.Serialize()),
+			hex.EncodeToString(sig1.Serialize()),
+		)
+	}
+	return sig1, nil
 }
 
 func (ss *shadowSigner) SignChannelAnnouncement(
