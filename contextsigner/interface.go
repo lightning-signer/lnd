@@ -97,6 +97,7 @@ type ChannelContextSigner interface {
 		signDesc *input.SignDescriptor,
 		commitPoint *btcec.PublicKey,
 		theirTx *wire.MsgTx,
+		witnessScript []byte,
 	) (input.Signature, error)
 
 	// Generate the both the node signature and the bitcoin (funding)

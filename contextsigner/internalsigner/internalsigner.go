@@ -233,6 +233,7 @@ func (is *InternalSigner) SignRemoteHTLCTx(
 	signDesc *input.SignDescriptor,
 	commitPoint *btcec.PublicKey,
 	theirTx *wire.MsgTx,
+	witnessScript []byte,
 ) (input.Signature, error) {
 	return is.signer.SignOutputRaw(theirTx, signDesc)
 }

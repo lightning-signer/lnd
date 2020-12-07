@@ -3029,7 +3029,8 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			Hash:  txHash,
 			Index: uint32(htlc.remoteOutputIndex),
 		}
-		sigJob.Tx, err = createHtlcTimeoutTx(
+		var witnessScript []byte
+		sigJob.Tx, witnessScript, err = createHtlcTimeoutTx(
 			chanType, op, outputAmt, htlc.Timeout,
 			uint32(remoteChanCfg.CsvDelay),
 			keyRing.RevocationKey, keyRing.ToLocalKey,
@@ -3055,6 +3056,7 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 		sigJob.OutputIndex = htlc.remoteOutputIndex
 		sigJob.ChanPoint = chanPoint
 		sigJob.CommitPoint = keyRing.CommitPoint
+		sigJob.WitnessScript = witnessScript
 
 		sigBatch = append(sigBatch, sigJob)
 	}
@@ -3085,7 +3087,8 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 			Hash:  txHash,
 			Index: uint32(htlc.remoteOutputIndex),
 		}
-		sigJob.Tx, err = createHtlcSuccessTx(
+		var witnessScript []byte
+		sigJob.Tx, witnessScript, err = createHtlcSuccessTx(
 			chanType, op, outputAmt, uint32(remoteChanCfg.CsvDelay),
 			keyRing.RevocationKey, keyRing.ToLocalKey,
 		)
@@ -3110,6 +3113,7 @@ func genRemoteHtlcSigJobs(keyRing *CommitmentKeyRing,
 		sigJob.OutputIndex = htlc.remoteOutputIndex
 		sigJob.ChanPoint = chanPoint
 		sigJob.CommitPoint = keyRing.CommitPoint
+		sigJob.WitnessScript = witnessScript
 
 		sigBatch = append(sigBatch, sigJob)
 	}
@@ -4118,7 +4122,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 				htlcFee := HtlcSuccessFee(chanType, feePerKw)
 				outputAmt := htlc.Amount.ToSatoshis() - htlcFee
 
-				successTx, err := createHtlcSuccessTx(
+				successTx, _, err := createHtlcSuccessTx(
 					chanType, op, outputAmt,
 					uint32(localChanCfg.CsvDelay),
 					keyRing.RevocationKey, keyRing.ToLocalKey,
@@ -4172,7 +4176,7 @@ func genHtlcSigValidationJobs(localCommitmentView *commitment,
 				htlcFee := HtlcTimeoutFee(chanType, feePerKw)
 				outputAmt := htlc.Amount.ToSatoshis() - htlcFee
 
-				timeoutTx, err := createHtlcTimeoutTx(
+				timeoutTx, _, err := createHtlcTimeoutTx(
 					chanType, op, outputAmt, htlc.Timeout,
 					uint32(localChanCfg.CsvDelay),
 					keyRing.RevocationKey, keyRing.ToLocalKey,
@@ -5681,7 +5685,7 @@ func newOutgoingHtlcResolution(signer contextsigner.ChannelContextSigner,
 
 	// With the fee calculated, re-construct the second level timeout
 	// transaction.
-	timeoutTx, err := createHtlcTimeoutTx(
+	timeoutTx, _, err := createHtlcTimeoutTx(
 		chanType, op, secondLevelOutputAmt, htlc.RefundTimeout,
 		csvDelay, keyRing.RevocationKey, keyRing.ToLocalKey,
 	)
@@ -5813,7 +5817,7 @@ func newIncomingHtlcResolution(signer contextsigner.ChannelContextSigner,
 	// taking into account the fee rate used.
 	htlcFee := HtlcSuccessFee(chanType, feePerKw)
 	secondLevelOutputAmt := htlc.Amt.ToSatoshis() - htlcFee
-	successTx, err := createHtlcSuccessTx(
+	successTx, _, err := createHtlcSuccessTx(
 		chanType, op, secondLevelOutputAmt, csvDelay,
 		keyRing.RevocationKey, keyRing.ToLocalKey,
 	)

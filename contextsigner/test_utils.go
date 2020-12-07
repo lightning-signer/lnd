@@ -108,6 +108,7 @@ func (ms *MockChannelContextSigner) SignRemoteHTLCTx(
 	signDesc *input.SignDescriptor,
 	commitPoint *btcec.PublicKey,
 	theirTx *wire.MsgTx,
+	witnessScript []byte,
 ) (input.Signature, error) {
 	return ms.signer.SignOutputRaw(theirTx, signDesc)
 }

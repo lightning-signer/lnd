@@ -47,7 +47,7 @@ var (
 //   * <0> <sender sig> <recvr sig> <preimage>
 func createHtlcSuccessTx(chanType channeldb.ChannelType,
 	htlcOutput wire.OutPoint, htlcAmt btcutil.Amount, csvDelay uint32,
-	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, error) {
+	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, []byte, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout).
@@ -68,11 +68,11 @@ func createHtlcSuccessTx(chanType channeldb.ChannelType,
 	witnessScript, err := input.SecondLevelHtlcScript(revocationKey, delayKey,
 		csvDelay)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pkScript, err := input.WitnessScriptHash(witnessScript)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Finally, the output is simply the amount of the HTLC (minus the
@@ -82,7 +82,7 @@ func createHtlcSuccessTx(chanType channeldb.ChannelType,
 		PkScript: pkScript,
 	})
 
-	return successTx, nil
+	return successTx, witnessScript, nil
 }
 
 // createHtlcTimeoutTx creates a transaction that spends the HTLC output on the
@@ -104,7 +104,7 @@ func createHtlcSuccessTx(chanType channeldb.ChannelType,
 func createHtlcTimeoutTx(chanType channeldb.ChannelType,
 	htlcOutput wire.OutPoint, htlcAmt btcutil.Amount,
 	cltvExpiry, csvDelay uint32,
-	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, error) {
+	revocationKey, delayKey *btcec.PublicKey) (*wire.MsgTx, []byte, error) {
 
 	// Create a version two transaction (as the success version of this
 	// spends an output with a CSV timeout), and set the lock-time to the
@@ -127,11 +127,11 @@ func createHtlcTimeoutTx(chanType channeldb.ChannelType,
 	witnessScript, err := input.SecondLevelHtlcScript(revocationKey, delayKey,
 		csvDelay)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pkScript, err := input.WitnessScriptHash(witnessScript)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Finally, the output is simply the amount of the HTLC (minus the
@@ -141,7 +141,7 @@ func createHtlcTimeoutTx(chanType channeldb.ChannelType,
 		PkScript: pkScript,
 	})
 
-	return timeoutTx, nil
+	return timeoutTx, witnessScript, nil
 }
 
 // SetStateNumHint encodes the current state number within the passed

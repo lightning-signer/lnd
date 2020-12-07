@@ -88,8 +88,9 @@ type SignJob struct {
 	OutputIndex int32
 
 	// Addtionally needed to use ContextSigning.
-	ChanPoint   *wire.OutPoint
-	CommitPoint *btcec.PublicKey
+	ChanPoint     *wire.OutPoint
+	CommitPoint   *btcec.PublicKey
+	WitnessScript []byte
 
 	// Cancel is a channel that should be closed if the caller wishes to
 	// abandon all pending sign jobs part of a single batch.
@@ -198,6 +199,7 @@ func (s *SigPool) poolWorker() {
 				&sigMsg.SignDesc,
 				sigMsg.CommitPoint,
 				sigMsg.Tx,
+				sigMsg.WitnessScript,
 			)
 			if err != nil {
 				select {
