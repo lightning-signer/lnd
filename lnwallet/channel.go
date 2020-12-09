@@ -5309,18 +5309,12 @@ func (lc *LightningChannel) getSignedCommitTx() (*wire.MsgTx, error) {
 		return nil, err
 	}
 
-	// With this, we then generate the full witness so the caller can
-	// broadcast a fully signed transaction.
-	// ourSig, err := lc.Signer.SignLocalCommitment(
-	// 	lnwire.NewChanIDFromOutPoint(lc.ChanPoint),
-	// 	lc.channelState.LocalChanCfg.MultiSigKey,
-	// 	lc.channelState.RemoteChanCfg.MultiSigKey,
-	// 	int64(lc.channelState.Capacity),
-	// 	commitTx,
-	// 	redeemScriptMap,
-	// )
 	lc.signDesc.SigHashes = txscript.NewTxSigHashes(commitTx)
-	ourSig, err := lc.Signer.Hack().SignOutputRaw(commitTx, lc.signDesc)
+	ourSig, err := lc.Signer.SignLocalCommitmentTx(
+		lnwire.NewChanIDFromOutPoint(lc.ChanPoint),
+		lc.signDesc,
+		commitTx,
+	)
 	if err != nil {
 		return nil, err
 	}

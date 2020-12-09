@@ -91,6 +91,13 @@ type ChannelContextSigner interface {
 		theirRedeemScriptMap input.RedeemScriptMap,
 	) (input.Signature, error)
 
+	// Sign the local commitment at force-close time.
+	SignLocalCommitmentTx(
+		chanID lnwire.ChannelID,
+		signDesc *input.SignDescriptor,
+		ourCommitTx *wire.MsgTx,
+	) (input.Signature, error)
+
 	// Generate our signature for the peer's htlc transactions.
 	SignRemoteHTLCTx(
 		chanID lnwire.ChannelID,

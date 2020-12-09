@@ -103,6 +103,14 @@ func (ms *MockChannelContextSigner) SignRemoteCommitmentTx(
 	return ms.signer.SignOutputRaw(theirCommitTx, &signDesc)
 }
 
+func (ms *MockChannelContextSigner) SignLocalCommitmentTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	return ms.signer.SignOutputRaw(ourCommitTx, signDesc)
+}
+
 func (ms *MockChannelContextSigner) SignRemoteHTLCTx(
 	chanID lnwire.ChannelID,
 	signDesc *input.SignDescriptor,

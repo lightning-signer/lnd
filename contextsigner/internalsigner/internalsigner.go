@@ -228,6 +228,14 @@ func (is *InternalSigner) SignRemoteCommitmentTx(
 	return is.signer.SignOutputRaw(theirCommitTx, &signDesc)
 }
 
+func (is *InternalSigner) SignLocalCommitmentTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	return is.signer.SignOutputRaw(ourCommitTx, signDesc)
+}
+
 func (is *InternalSigner) SignRemoteHTLCTx(
 	chanID lnwire.ChannelID,
 	signDesc *input.SignDescriptor,
