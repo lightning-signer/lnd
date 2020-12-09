@@ -610,11 +610,11 @@ func (rsi *RemoteSigner) SignRemoteCommitmentTx(
 	}
 
 	if len(theirCommitTx.TxIn) != 1 {
-		return nil, fmt.Errorf("commitment tx must have one input")
+		return nil, fmt.Errorf("remote commitment tx must have one input")
 	}
 	var inputDescs []*InputDescriptor
 	inputDescs = append(inputDescs, &InputDescriptor{
-		ValueSat: int64(channelValueSat),
+		ValueSat: channelValueSat,
 	})
 	var outputDescs []*OutputDescriptor
 	for _, txi := range theirCommitTx.TxOut {
@@ -639,6 +639,63 @@ func (rsi *RemoteSigner) SignRemoteCommitmentTx(
 	)
 	if err != nil {
 		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
+		return nil, err
+	}
+	sig := rsp.Signature.Data
+
+	// Chop off the sighash flag at the end of the signature.
+	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
+}
+
+func (rsi *RemoteSigner) SignLocalCommitmentTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	log.Debugf("SignLocalCommitmentTx: chanID=%s signDesc=%s ourCommitTx=%s",
+		spew.Sdump(chanID), spew.Sdump(signDesc), spew.Sdump(ourCommitTx))
+
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var rawTxBytes bytes.Buffer
+	err := ourCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ourCommitTx.TxIn) != 1 {
+		return nil, fmt.Errorf("local commitment tx must have one input")
+	}
+	var inputDescs []*InputDescriptor
+	inputDescs = append(inputDescs, &InputDescriptor{
+		ValueSat: signDesc.Output.Value,
+	})
+	var outputDescs []*OutputDescriptor
+	for _, txi := range ourCommitTx.TxOut {
+		_ = txi
+		outputDescs = append(outputDescs, &OutputDescriptor{
+			// Witscript: ourRedeemScriptMap.Lookup(txi.PkScript),
+		})
+	}
+
+	rsp, err := rsi.client.SignCommitmentTx(ctx,
+		&SignCommitmentTxRequest{
+			NodeId:       &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
+			Tx: &Transaction{
+				RawTxBytes:  rawTxBytes.Bytes(),
+				InputDescs:  inputDescs,
+				OutputDescs: outputDescs,
+			},
+		},
+	)
+	if err != nil {
+		log.Errorf("SignLocalCommitmentTx failed: %v", err)
 		return nil, err
 	}
 	sig := rsp.Signature.Data
