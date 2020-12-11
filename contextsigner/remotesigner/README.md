@@ -29,3 +29,21 @@ Run a single unit test:
     go test -v -count=1 \
         -run TestCustomShutdownScript/User_set_script \
         github.com/lightningnetwork/lnd/peer
+
+Run all integration tests when individual tests fail:
+
+```
+diff --git a/lntest/itest/lnd_test.go b/lntest/itest/lnd_test.go
+index bcb76d16..890ee084 100644
+--- a/lntest/itest/lnd_test.go
++++ b/lntest/itest/lnd_test.go
+@@ -14192,7 +14192,7 @@ func TestLightningNetworkDaemon(t *testing.T) {
+ 			// failure.
+ 			t.Logf("Failure time: %v",
+ 				time.Now().Format("2006-01-02 15:04:05.000"))
+-			break
++			// break
+ 		}
+ 	}
+ }
+```
