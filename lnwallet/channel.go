@@ -6243,7 +6243,11 @@ func (lc *LightningChannel) CreateCloseProposal(proposedFee btcutil.Amount,
 	// using the generated txid to be notified once the closure transaction
 	// has been confirmed.
 	lc.signDesc.SigHashes = txscript.NewTxSigHashes(closeTx)
-	sig, err := lc.Signer.Hack().SignOutputRaw(closeTx, lc.signDesc)
+	sig, err := lc.Signer.SignMutualCloseTx(
+		lnwire.NewChanIDFromOutPoint(lc.ChanPoint),
+		lc.signDesc,
+		closeTx,
+	)
 	if err != nil {
 		return nil, nil, 0, err
 	}

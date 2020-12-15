@@ -74,6 +74,13 @@ type ChannelContextSigner interface {
 		isTweakless bool,
 	) error
 
+	// Sign the cooperative mutual close transaction.
+	SignMutualCloseTx(
+		chanID lnwire.ChannelID,
+		signDesc *input.SignDescriptor,
+		ourCommitTx *wire.MsgTx,
+	) (input.Signature, error)
+
 	// Generate our signatures for the funding transaction.
 	SignFundingTx(
 		signDescs []*input.SignDescriptor,

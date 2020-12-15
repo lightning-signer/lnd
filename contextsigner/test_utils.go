@@ -64,6 +64,14 @@ func (ms *MockChannelContextSigner) ReadyChannel(
 		"ReadyChannel")
 }
 
+func (ms *MockChannelContextSigner) SignMutualCloseTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	return ms.signer.SignOutputRaw(ourCommitTx, signDesc)
+}
+
 func (ms *MockChannelContextSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	fundingTx *wire.MsgTx,

@@ -171,6 +171,14 @@ func (is *InternalSigner) ReadyChannel(
 	return nil
 }
 
+func (is *InternalSigner) SignMutualCloseTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	return is.signer.SignOutputRaw(ourCommitTx, signDesc)
+}
+
 func (is *InternalSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	fundingTx *wire.MsgTx,
