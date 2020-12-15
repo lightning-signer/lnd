@@ -303,6 +303,37 @@ func (ss *shadowSigner) ReadyChannel(
 	return nil
 }
 
+func (ss *shadowSigner) SignMutualCloseTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	sig0, err := ss.internalSigner.SignMutualCloseTx(
+		chanID,
+		signDesc,
+		ourCommitTx,
+	)
+	if err != nil {
+		return nil, err
+	}
+	sig1, err := ss.remoteSigner.SignMutualCloseTx(
+		chanID,
+		signDesc,
+		ourCommitTx,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(sig0, sig1) {
+		return nil, fmt.Errorf("ShadowSigner.SignMutualCloseTx mismatch: "+
+			"internal=%s remote=%s",
+			hex.EncodeToString(sig0.Serialize()),
+			hex.EncodeToString(sig1.Serialize()),
+		)
+	}
+	return sig1, nil
+}
+
 func (ss *shadowSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	multiSigIndex uint32,

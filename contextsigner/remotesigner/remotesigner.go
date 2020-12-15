@@ -458,6 +458,63 @@ func (rsi *RemoteSigner) ReadyChannel(
 	return nil
 }
 
+func (rsi *RemoteSigner) SignMutualCloseTx(
+	chanID lnwire.ChannelID,
+	signDesc *input.SignDescriptor,
+	ourCommitTx *wire.MsgTx,
+) (input.Signature, error) {
+	log.Debugf("SignMutualCloseTx: chanID=%s signDesc=%s ourCommitTx=%s",
+		spew.Sdump(chanID), spew.Sdump(signDesc), spew.Sdump(ourCommitTx))
+
+	if rsi.nodeID == nil {
+		return nil, fmt.Errorf("remotesigner nodeID not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var rawTxBytes bytes.Buffer
+	err := ourCommitTx.BtcEncode(&rawTxBytes, 0, wire.WitnessEncoding)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ourCommitTx.TxIn) != 1 {
+		return nil, fmt.Errorf("mutual close tx must have one input")
+	}
+	var inputDescs []*InputDescriptor
+	inputDescs = append(inputDescs, &InputDescriptor{
+		ValueSat: signDesc.Output.Value,
+	})
+	var outputDescs []*OutputDescriptor
+	for _, txi := range ourCommitTx.TxOut {
+		_ = txi
+		outputDescs = append(outputDescs, &OutputDescriptor{
+			// Witscript: ourRedeemScriptMap.Lookup(txi.PkScript),
+		})
+	}
+
+	rsp, err := rsi.client.SignMutualCloseTx(ctx,
+		&SignMutualCloseTxRequest{
+			NodeId:       &NodeId{Data: rsi.nodeID[:]},
+			ChannelNonce: &ChannelNonce{Data: chanID[:]},
+			Tx: &Transaction{
+				RawTxBytes:  rawTxBytes.Bytes(),
+				InputDescs:  inputDescs,
+				OutputDescs: outputDescs,
+			},
+		},
+	)
+	if err != nil {
+		log.Errorf("SignMutualCloseTx failed: %v", err)
+		return nil, err
+	}
+	sig := rsp.Signature.Data
+
+	// Chop off the sighash flag at the end of the signature.
+	return btcec.ParseDERSignature(sig[:len(sig)-1], btcec.S256())
+}
+
 func (rsi *RemoteSigner) SignFundingTx(
 	signDescs []*input.SignDescriptor,
 	multiSigIndex uint32,
@@ -565,17 +622,6 @@ func (rsi *RemoteSigner) SignFundingTx(
 		if wit == nil {
 			scripts = append(scripts, nil)
 		} else {
-			// sig0 := wit.Signature.Data
-			// // Chop off the sighash flag at the end of the signature.
-			// sig, err := btcec.ParseDERSignature(
-			// 	sig0[:len(sig0)-1], btcec.S256())
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// pubkey, err := btcec.ParsePubKey(wit.Pubkey.Data, btcec.S256())
-			// if err != nil {
-			// 	return nil, err
-			// }
 			witness := wire.TxWitness{
 				wit.Signature.Data,
 				wit.Pubkey.Data,
@@ -679,6 +725,7 @@ func (rsi *RemoteSigner) SignLocalCommitmentTx(
 	for _, txi := range ourCommitTx.TxOut {
 		_ = txi
 		outputDescs = append(outputDescs, &OutputDescriptor{
+			// FIXME - we'll need the witscript to validate.
 			// Witscript: ourRedeemScriptMap.Lookup(txi.PkScript),
 		})
 	}
@@ -755,7 +802,7 @@ func (rsi *RemoteSigner) SignRemoteHTLCTx(
 		},
 	)
 	if err != nil {
-		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
+		log.Errorf("SignRemoteHTLCTx failed: %v", err)
 		return nil, err
 	}
 	sig := rsp.Signature.Data
