@@ -428,9 +428,9 @@ func (rsi *RemoteSigner) ReadyChannel(
 				Txid:  fundingOutpoint.Hash[:],
 				Index: fundingOutpoint.Index,
 			},
-			LocalToSelfDelay:    uint32(localToSelfDelay),
-			LocalShutdownScript: localShutdownScript,
-			RemoteBasepoints: &Basepoints{
+			HolderToSelfDelay:    uint32(localToSelfDelay),
+			HolderShutdownScript: localShutdownScript,
+			CounterpartyBasepoints: &Basepoints{
 				Revocation: &PubKey{
 					Data: remoteRevocationBasepoint.SerializeCompressed(),
 				},
@@ -447,9 +447,9 @@ func (rsi *RemoteSigner) ReadyChannel(
 					Data: remoteFundingPubkey.SerializeCompressed(),
 				},
 			},
-			RemoteToSelfDelay:    uint32(remoteToSelfDelay),
-			RemoteShutdownScript: remoteShutdownScript,
-			CommitmentType:       commitmentType,
+			CounterpartyToSelfDelay:    uint32(remoteToSelfDelay),
+			CounterpartyShutdownScript: remoteShutdownScript,
+			CommitmentType:             commitmentType,
 		})
 	if err != nil {
 		return err
@@ -669,8 +669,8 @@ func (rsi *RemoteSigner) SignRemoteCommitmentTx(
 		})
 	}
 
-	rsp, err := rsi.client.SignRemoteCommitmentTx(ctx,
-		&SignRemoteCommitmentTxRequest{
+	rsp, err := rsi.client.SignCounterpartyCommitmentTx(ctx,
+		&SignCounterpartyCommitmentTxRequest{
 			NodeId:       &NodeId{Data: rsi.nodeID[:]},
 			ChannelNonce: &ChannelNonce{Data: chanID[:]},
 			RemotePerCommitPoint: &PubKey{
@@ -684,7 +684,7 @@ func (rsi *RemoteSigner) SignRemoteCommitmentTx(
 		},
 	)
 	if err != nil {
-		log.Errorf("SignRemoteCommitmentTx failed: %v", err)
+		log.Errorf("SignCounterpartyCommitmentTx failed: %v", err)
 		return nil, err
 	}
 	sig := rsp.Signature.Data
@@ -698,7 +698,7 @@ func (rsi *RemoteSigner) SignLocalCommitmentTx(
 	signDesc *input.SignDescriptor,
 	ourCommitTx *wire.MsgTx,
 ) (input.Signature, error) {
-	log.Debugf("SignLocalCommitmentTx: chanID=%s signDesc=%s ourCommitTx=%s",
+	log.Debugf("SignHolderCommitmentTx: chanID=%s signDesc=%s ourCommitTx=%s",
 		spew.Sdump(chanID), spew.Sdump(signDesc), spew.Sdump(ourCommitTx))
 
 	if rsi.nodeID == nil {
@@ -730,8 +730,8 @@ func (rsi *RemoteSigner) SignLocalCommitmentTx(
 		})
 	}
 
-	rsp, err := rsi.client.SignCommitmentTx(ctx,
-		&SignCommitmentTxRequest{
+	rsp, err := rsi.client.SignHolderCommitmentTx(ctx,
+		&SignHolderCommitmentTxRequest{
 			NodeId:       &NodeId{Data: rsi.nodeID[:]},
 			ChannelNonce: &ChannelNonce{Data: chanID[:]},
 			Tx: &Transaction{
@@ -742,7 +742,7 @@ func (rsi *RemoteSigner) SignLocalCommitmentTx(
 		},
 	)
 	if err != nil {
-		log.Errorf("SignLocalCommitmentTx failed: %v", err)
+		log.Errorf("SignHolderCommitmentTx failed: %v", err)
 		return nil, err
 	}
 	sig := rsp.Signature.Data
@@ -787,8 +787,8 @@ func (rsi *RemoteSigner) SignRemoteHTLCTx(
 		Witscript: witnessScript,
 	})
 
-	rsp, err := rsi.client.SignRemoteHTLCTx(ctx,
-		&SignRemoteHTLCTxRequest{
+	rsp, err := rsi.client.SignCounterpartyHTLCTx(ctx,
+		&SignCounterpartyHTLCTxRequest{
 			NodeId:       &NodeId{Data: rsi.nodeID[:]},
 			ChannelNonce: &ChannelNonce{Data: chanID[:]},
 			Tx: &Transaction{
@@ -802,7 +802,7 @@ func (rsi *RemoteSigner) SignRemoteHTLCTx(
 		},
 	)
 	if err != nil {
-		log.Errorf("SignRemoteHTLCTx failed: %v", err)
+		log.Errorf("SignCounterpartyHTLCTx failed: %v", err)
 		return nil, err
 	}
 	sig := rsp.Signature.Data
